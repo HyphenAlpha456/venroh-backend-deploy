@@ -3,13 +3,13 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import connectDB from './config/db.js';
+import connectDB from './src/config/db.js';
 
-import authRoutes from './routes/authRoutes.js';
-import startupRoutes from './routes/startupRoutes.js';
-import walletRoutes from './routes/walletRoutes.js';
-import meetingRoutes from './routes/meetingRoutes.js';
-import chatRoutes from './routes/chatRoutes.js';
+import authRoutes from './src/routes/authRoutes.js';
+import startupRoutes from './src/routes/startupRoutes.js';
+import walletRoutes from './src/routes/walletRoutes.js';
+import meetingRoutes from './src/routes/meetingRoutes.js';
+import chatRoutes from './src/routes/chatRoutes.js';
 
 dotenv.config();
 
@@ -29,8 +29,8 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/startups', startupRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/startups', startupRoutes);
 app.use('/api/v1/wallet', walletRoutes);
 app.use('/api/v1/meetings', meetingRoutes);
 app.use('/api/v1/chat', chatRoutes);
