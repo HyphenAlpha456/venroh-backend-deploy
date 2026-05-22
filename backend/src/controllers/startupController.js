@@ -1,6 +1,21 @@
 import mongoose from 'mongoose';
 import Startup from '../models/Startup.js';
 
+// simulate mca api call for cin verification
+const verifyMCAStatus = async (cin) => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      if (!cin || cin.length !== 21) {
+        return resolve({ verified: false, message: 'Invalid CIN format' });
+      }
+      resolve({ 
+        verified: true, 
+        legalName: 'Auto-Fetched Company Name Pvt Ltd'
+      });
+    }, 600);
+  });
+};
+
 // @desc    Founder creates startup
 // @route   POST /api/startups
 // @access  founder
@@ -54,11 +69,21 @@ export const createStartup = async (req, res) => {
       });
     }
 
+    // verify cin with mca before creating
+    const mcaResponse = await verifyMCAStatus(normalizedCin);
+    
+    if (!mcaResponse.verified) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'MCA Verification failed. Please check your CIN.' 
+      });
+    }
+
     const startup = await Startup.create({
       founderId: req.user._id,
       companyName: companyName.trim(),
       cin: normalizedCin,
-      mcaStatus: 'Pending',
+      mcaStatus: 'Verified',
       authorizedCapital: authorizedCapital || 0,
       paidUpCapital: paidUpCapital || 0,
       valuationAsk,
@@ -259,11 +284,7 @@ export const updateMyStartup = async (req, res) => {
       }
     });
 
-    /*
-      Important:
-      If founder changes startup data, make it non-live again.
-      Admin should approve it again before investors see it.
-    */
+    // set isLive to false if founder updates details
     startup.isLive = false;
 
     const updatedStartup = await startup.save();
