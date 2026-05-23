@@ -3,13 +3,16 @@ import express from 'express';
 import {
   createConversationFromStartup,
   getMyConversations,
-  getConversationMessages
+  getConversationMessages,
+  uploadConversationFile
 } from '../controllers/chatController.js';
 
 import {
   protect,
   authorizeRoles
 } from '../middleware/authMiddleware.js';
+
+import { uploadChatFile } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -32,6 +35,14 @@ router.get(
   protect,
   authorizeRoles('investor', 'founder'),
   getConversationMessages
+);
+
+router.post(
+  '/conversations/:conversationId/files',
+  protect,
+  authorizeRoles('investor', 'founder'),
+  uploadChatFile.single('file'),
+  uploadConversationFile
 );
 
 export default router;

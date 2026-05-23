@@ -211,3 +211,66 @@ export const getConversationMessages = async (req, res) => {
     });
   }
 };
+
+// @desc    Upload file for chat message
+// @route   POST /api/v1/chat/conversations/:conversationId/files
+// @access  investor/founder
+export const uploadConversationFile = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid conversation ID'
+      });
+    }
+
+    const conversation = await Conversation.findById(conversationId);
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation not found'
+      });
+    }
+
+    const isParticipant = conversation.participants.some(
+      (id) => id.toString() === req.user._id.toString()
+    );
+
+    if (!isParticipant) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not allowed to upload files in this conversation'
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    const fileUrl = `/uploads/chat/${req.file.filename}`;
+
+    return res.status(201).json({
+      success: true,
+      message: 'File uploaded successfully',
+      attachment: {
+        url: fileUrl,
+        fileName: req.file.originalname,
+        fileType: req.file.mimetype,
+        fileSize: req.file.size
+      }
+    });
+  } catch (error) {
+    console.error('Upload Conversation File Error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Server error while uploading file'
+    });
+  }
+};
