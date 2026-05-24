@@ -14,6 +14,38 @@ const getAllowedOrigins = () => {
   return process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim());
 };
 
+const normalizeSocketAttachments = (attachments = []) => {
+  return attachments.map((attachment) => {
+    const secureUrl = attachment.secure_url || attachment.secureUrl || '';
+    const url = secureUrl || attachment.url || '';
+
+    const fileName =
+      attachment.fileName ||
+      attachment.original_filename ||
+      attachment.originalFileName ||
+      attachment.public_id ||
+      'file';
+
+    return {
+      url,
+      secureUrl,
+      publicId: attachment.public_id || attachment.publicId || '',
+      assetId: attachment.asset_id || attachment.assetId || '',
+      fileName,
+      originalFileName: attachment.original_filename || attachment.originalFileName || fileName,
+      fileType: attachment.mime_type || attachment.fileType || '',
+      fileSize: attachment.bytes || attachment.fileSize || 0,
+      resourceType: attachment.resource_type || attachment.resourceType || '',
+      format: attachment.format || '',
+      bytes: attachment.bytes || 0,
+      width: attachment.width || null,
+      height: attachment.height || null,
+      cloudinaryVersion: attachment.version || null,
+      provider: attachment.provider || 'cloudinary'
+    };
+  });
+};
+
 export const initSocket = (server) => {
   const io = new Server(server, {
     cors: {
@@ -100,92 +132,94 @@ export const initSocket = (server) => {
       }
     });
 
-   socket.on('send_message', async ({ conversationId, text, attachments = [] }) => {
-  try {
-    if (!conversationId) {
-      return socket.emit('chat_error', {
-        message: 'conversationId is required'
-      });
-    }
+    socket.on('send_message', async ({ conversationId, text, attachments = [] }) => {
+      try {
+        if (!conversationId) {
+          return socket.emit('chat_error', {
+            message: 'conversationId is required'
+          });
+        }
 
-    const safeAttachments = Array.isArray(attachments) ? attachments : [];
+        const safeAttachments = Array.isArray(attachments)
+          ? normalizeSocketAttachments(attachments)
+          : [];
 
-    if (!text?.trim() && safeAttachments.length === 0) {
-      return socket.emit('chat_error', {
-        message: 'Message cannot be empty'
-      });
-    }
+        if (!text?.trim() && safeAttachments.length === 0) {
+          return socket.emit('chat_error', {
+            message: 'Message cannot be empty'
+          });
+        }
 
-    const invalidAttachment = safeAttachments.some((attachment) => {
-      return !attachment.url || !attachment.fileName;
+        const invalidAttachment = safeAttachments.some((attachment) => {
+          return !attachment.url || !attachment.fileName;
+        });
+
+        if (invalidAttachment) {
+          return socket.emit('chat_error', {
+            message: 'Invalid attachment data'
+          });
+        }
+
+        const conversation = await Conversation.findById(conversationId);
+
+        if (!conversation) {
+          return socket.emit('chat_error', {
+            message: 'Conversation not found'
+          });
+        }
+
+        const isParticipant = conversation.participants.some(
+          (id) => id.toString() === userId
+        );
+
+        if (!isParticipant) {
+          return socket.emit('chat_error', {
+            message: 'You are not allowed to send message in this conversation'
+          });
+        }
+
+        const startup = await Startup.findById(conversation.startupId);
+
+        if (!startup) {
+          return socket.emit('chat_error', {
+            message: 'Startup linked with this conversation was not found'
+          });
+        }
+
+        if (!startup.isLive) {
+          return socket.emit('chat_error', {
+            message: 'Chat is disabled because this startup is not live'
+          });
+        }
+
+        let message = await Message.create({
+          conversationId,
+          senderId: userId,
+          text: text?.trim() || '',
+          attachments: safeAttachments,
+          readBy: [userId]
+        });
+
+        await Conversation.findByIdAndUpdate(conversationId, {
+          lastMessage: message._id,
+          lastMessageText: text?.trim() || '📎 Attachment',
+          updatedAt: new Date()
+        });
+
+        message = await Message.findById(message._id).populate(
+          'senderId',
+          'name email role'
+        );
+
+        io.to(conversationId).emit('receive_message', message);
+      } catch (error) {
+        console.error('Send Message Socket Error:', error);
+
+        socket.emit('chat_error', {
+          message: 'Failed to send message'
+        });
+      }
     });
-
-    if (invalidAttachment) {
-      return socket.emit('chat_error', {
-        message: 'Invalid attachment data'
-      });
-    }
-
-    const conversation = await Conversation.findById(conversationId);
-
-    if (!conversation) {
-      return socket.emit('chat_error', {
-        message: 'Conversation not found'
-      });
-    }
-
-    const isParticipant = conversation.participants.some(
-      (id) => id.toString() === userId
-    );
-
-    if (!isParticipant) {
-      return socket.emit('chat_error', {
-        message: 'You are not allowed to send message in this conversation'
-      });
-    }
-
-    const startup = await Startup.findById(conversation.startupId);
-
-    if (!startup) {
-      return socket.emit('chat_error', {
-        message: 'Startup linked with this conversation was not found'
-      });
-    }
-
-    if (!startup.isLive) {
-      return socket.emit('chat_error', {
-        message: 'Chat is disabled because this startup is not live'
-      });
-    }
-
-    let message = await Message.create({
-      conversationId,
-      senderId: userId,
-      text: text?.trim() || '',
-      attachments: safeAttachments,
-      readBy: [userId]
-    });
-
-    await Conversation.findByIdAndUpdate(conversationId, {
-      lastMessage: message._id,
-      lastMessageText: text?.trim() || '📎 Attachment',
-      updatedAt: new Date()
-    });
-
-    message = await Message.findById(message._id).populate(
-      'senderId',
-      'name email role'
-    );
-
-    io.to(conversationId).emit('receive_message', message);
-  } catch (error) {
-    console.error('Send Message Socket Error:', error);
-
-    socket.emit('chat_error', {
-      message: 'Failed to send message'
-    });
-  }
-});
 
     socket.on('typing', ({ conversationId }) => {
       socket.to(conversationId).emit('typing', {

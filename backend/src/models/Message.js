@@ -7,9 +7,29 @@ const attachmentSchema = new mongoose.Schema(
       required: true
     },
 
+    secureUrl: {
+      type: String,
+      default: ''
+    },
+
+    publicId: {
+      type: String,
+      default: ''
+    },
+
+    assetId: {
+      type: String,
+      default: ''
+    },
+
     fileName: {
       type: String,
       required: true
+    },
+
+    originalFileName: {
+      type: String,
+      default: ''
     },
 
     fileType: {
@@ -20,6 +40,43 @@ const attachmentSchema = new mongoose.Schema(
     fileSize: {
       type: Number,
       default: 0
+    },
+
+    resourceType: {
+      type: String,
+      enum: ['image', 'video', 'raw', 'auto', ''],
+      default: ''
+    },
+
+    format: {
+      type: String,
+      default: ''
+    },
+
+    bytes: {
+      type: Number,
+      default: 0
+    },
+
+    width: {
+      type: Number,
+      default: null
+    },
+
+    height: {
+      type: Number,
+      default: null
+    },
+
+    cloudinaryVersion: {
+      type: Number,
+      default: null
+    },
+
+    provider: {
+      type: String,
+      enum: ['local', 'cloudinary'],
+      default: 'cloudinary'
     }
   },
   { _id: false }

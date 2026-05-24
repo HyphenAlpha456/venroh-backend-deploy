@@ -4,15 +4,14 @@ import {
   createConversationFromStartup,
   getMyConversations,
   getConversationMessages,
-  uploadConversationFile
+  createCloudinaryChatUploadSignature,
+  saveCloudinaryFileMessage
 } from '../controllers/chatController.js';
 
 import {
   protect,
   authorizeRoles
 } from '../middleware/authMiddleware.js';
-
-import { uploadChatFile } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -38,11 +37,17 @@ router.get(
 );
 
 router.post(
-  '/conversations/:conversationId/files',
+  '/conversations/:conversationId/cloudinary-signature',
   protect,
   authorizeRoles('investor', 'founder'),
-  uploadChatFile.single('file'),
-  uploadConversationFile
+  createCloudinaryChatUploadSignature
+);
+
+router.post(
+  '/conversations/:conversationId/cloudinary-file-message',
+  protect,
+  authorizeRoles('investor', 'founder'),
+  saveCloudinaryFileMessage
 );
 
 export default router;

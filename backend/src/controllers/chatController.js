@@ -1,4 +1,7 @@
+import crypto from 'crypto';
 import mongoose from 'mongoose';
+
+import cloudinary from '../config/cloudinary.js';
 import Startup from '../models/Startup.js';
 import Conversation from '../models/Conversation.js';
 import Message from '../models/Message.js';
@@ -10,6 +13,131 @@ const createParticipantKey = (userId1, userId2) => {
 const isInvestorFounderPair = (role1, role2) => {
   const pair = [role1, role2].sort().join('_');
   return pair === 'founder_investor';
+};
+
+const getMaxChatFileBytes = () => {
+  return Number(process.env.MAX_CHAT_FILE_BYTES || 5368709120);
+};
+
+const allowedMimeTypes = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'video/mp4',
+  'video/quicktime',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/octet-stream'
+];
+
+const sanitizeFileName = (fileName = 'file') => {
+  return fileName
+    .replace(/\.[^/.]+$/, '')
+    .replace(/[^a-zA-Z0-9-_]/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 80);
+};
+
+const getResourceTypeFromMimeType = (mimeType = '') => {
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  return 'raw';
+};
+
+const checkConversationAccess = async ({ conversationId, user }) => {
+  if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    return {
+      ok: false,
+      statusCode: 400,
+      message: 'Invalid conversation ID'
+    };
+  }
+
+  const conversation = await Conversation.findById(conversationId);
+
+  if (!conversation) {
+    return {
+      ok: false,
+      statusCode: 404,
+      message: 'Conversation not found'
+    };
+  }
+
+  const isParticipant = conversation.participants.some(
+    (id) => id.toString() === user._id.toString()
+  );
+
+  if (!isParticipant) {
+    return {
+      ok: false,
+      statusCode: 403,
+      message: 'You are not allowed to access this conversation'
+    };
+  }
+
+  const startup = await Startup.findById(conversation.startupId);
+
+  if (!startup) {
+    return {
+      ok: false,
+      statusCode: 404,
+      message: 'Startup linked with this conversation was not found'
+    };
+  }
+
+  if (!startup.isLive) {
+    return {
+      ok: false,
+      statusCode: 403,
+      message: 'Chat is disabled because this startup is not live'
+    };
+  }
+
+  return {
+    ok: true,
+    conversation,
+    startup
+  };
+};
+
+const normalizeCloudinaryAttachment = ({ attachment, fallbackFileName, fallbackMimeType }) => {
+  const secureUrl = attachment.secure_url || attachment.secureUrl || '';
+  const url = secureUrl || attachment.url || '';
+
+  const fileName =
+    fallbackFileName ||
+    attachment.original_filename ||
+    attachment.originalFileName ||
+    attachment.fileName ||
+    attachment.public_id ||
+    'file';
+
+  return {
+    url,
+    secureUrl,
+    publicId: attachment.public_id || attachment.publicId || '',
+    assetId: attachment.asset_id || attachment.assetId || '',
+    fileName,
+    originalFileName: attachment.original_filename || attachment.originalFileName || fileName,
+    fileType: fallbackMimeType || attachment.mime_type || attachment.fileType || '',
+    fileSize: attachment.bytes || attachment.fileSize || 0,
+    resourceType: attachment.resource_type || attachment.resourceType || '',
+    format: attachment.format || '',
+    bytes: attachment.bytes || 0,
+    width: attachment.width || null,
+    height: attachment.height || null,
+    cloudinaryVersion: attachment.version || null,
+    provider: 'cloudinary'
+  };
 };
 
 // @desc    Investor starts or gets conversation with startup founder
@@ -212,65 +340,168 @@ export const getConversationMessages = async (req, res) => {
   }
 };
 
-// @desc    Upload file for chat message
-// @route   POST /api/v1/chat/conversations/:conversationId/files
+// @desc    Generate Cloudinary signed upload params for chat file
+// @route   POST /api/v1/chat/conversations/:conversationId/cloudinary-signature
 // @access  investor/founder
-export const uploadConversationFile = async (req, res) => {
+export const createCloudinaryChatUploadSignature = async (req, res) => {
   try {
     const { conversationId } = req.params;
+    const { fileName, fileSize, mimeType } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+    if (!fileName) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid conversation ID'
+        message: 'fileName is required'
       });
     }
 
-    const conversation = await Conversation.findById(conversationId);
-
-    if (!conversation) {
-      return res.status(404).json({
+    if (!fileSize || Number(fileSize) <= 0) {
+      return res.status(400).json({
         success: false,
-        message: 'Conversation not found'
+        message: 'Valid fileSize is required'
       });
     }
 
-    const isParticipant = conversation.participants.some(
-      (id) => id.toString() === req.user._id.toString()
+    if (Number(fileSize) > getMaxChatFileBytes()) {
+      return res.status(400).json({
+        success: false,
+        message: 'File size exceeds backend allowed limit'
+      });
+    }
+
+    if (mimeType && !allowedMimeTypes.includes(mimeType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'This file type is not allowed'
+      });
+    }
+
+    const access = await checkConversationAccess({
+      conversationId,
+      user: req.user
+    });
+
+    if (!access.ok) {
+      return res.status(access.statusCode).json({
+        success: false,
+        message: access.message
+      });
+    }
+
+    const timestamp = Math.round(Date.now() / 1000);
+    const uploadId = crypto.randomUUID();
+
+    const folder = process.env.CLOUDINARY_CHAT_FOLDER || 'chat-files';
+    const cleanName = sanitizeFileName(fileName);
+    const publicId = `${folder}/${conversationId}/${req.user._id}/${Date.now()}-${cleanName}`;
+
+    const resourceType = getResourceTypeFromMimeType(mimeType);
+
+    const paramsToSign = {
+      public_id: publicId,
+      timestamp
+    };
+
+    const signature = cloudinary.utils.api_sign_request(
+      paramsToSign,
+      process.env.CLOUDINARY_API_SECRET
     );
 
-    if (!isParticipant) {
-      return res.status(403).json({
-        success: false,
-        message: 'You are not allowed to upload files in this conversation'
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No file uploaded'
-      });
-    }
-
-    const fileUrl = `/uploads/chat/${req.file.filename}`;
-
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
-      message: 'File uploaded successfully',
-      attachment: {
-        url: fileUrl,
-        fileName: req.file.originalname,
-        fileType: req.file.mimetype,
-        fileSize: req.file.size
+      upload: {
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+        apiKey: process.env.CLOUDINARY_API_KEY,
+        timestamp,
+        signature,
+        publicId,
+        uploadId,
+        resourceType,
+        uploadUrl: `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`
       }
     });
   } catch (error) {
-    console.error('Upload Conversation File Error:', error);
+    console.error('Create Cloudinary Chat Upload Signature Error:', error);
 
     return res.status(500).json({
       success: false,
-      message: error.message || 'Server error while uploading file'
+      message: 'Server error while creating Cloudinary upload signature'
+    });
+  }
+};
+
+// @desc    Save Cloudinary uploaded file as chat message
+// @route   POST /api/v1/chat/conversations/:conversationId/cloudinary-file-message
+// @access  investor/founder
+export const saveCloudinaryFileMessage = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { text = '', attachment, fileName, mimeType } = req.body;
+
+    if (!attachment) {
+      return res.status(400).json({
+        success: false,
+        message: 'attachment is required'
+      });
+    }
+
+    const attachmentUrl = attachment.secure_url || attachment.secureUrl || attachment.url;
+
+    if (!attachmentUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Cloudinary attachment response'
+      });
+    }
+
+    const access = await checkConversationAccess({
+      conversationId,
+      user: req.user
+    });
+
+    if (!access.ok) {
+      return res.status(access.statusCode).json({
+        success: false,
+        message: access.message
+      });
+    }
+
+    const normalizedAttachment = normalizeCloudinaryAttachment({
+      attachment,
+      fallbackFileName: fileName,
+      fallbackMimeType: mimeType
+    });
+
+    let message = await Message.create({
+      conversationId,
+      senderId: req.user._id,
+      text: text?.trim() || '',
+      attachments: [normalizedAttachment],
+      readBy: [req.user._id]
+    });
+
+    await Conversation.findByIdAndUpdate(conversationId, {
+      lastMessage: message._id,
+      lastMessageText: text?.trim() || '📎 Attachment',
+      updatedAt: new Date()
+    });
+
+    message = await Message.findById(message._id).populate(
+      'senderId',
+      'name email role'
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Cloudinary file message saved successfully',
+      data: message
+    });
+  } catch (error) {
+    console.error('Save Cloudinary File Message Error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while saving Cloudinary file message'
     });
   }
 };
