@@ -43,6 +43,91 @@ const createCalendarInvite = async (investorEmail, founderEmail, scheduledTime, 
   });
 };
 
+export const updateAvailabilitySlots = async (req, res) => {
+  const { slots } = req.body; 
+
+  if (!Array.isArray(slots)) {
+    return res.status(400).json({ success: false, message: 'Slots must be an array' });
+  }
+
+  try {
+    const startup = await Startup.findOne({ founderId: req.user._id });
+    if (!startup) {
+      return res.status(404).json({ success: false, message: 'Startup not found' });
+    }
+
+    const formattedSlots = slots.map(slot => ({
+      startTime: new Date(slot.startTime),
+      endTime: new Date(slot.endTime),
+      status: 'available',
+      bookedBy: null
+    }));
+
+    startup.availabilitySlots = formattedSlots;
+    await startup.save();
+
+    return res.status(200).json({ success: true, slots: startup.availabilitySlots });
+  } catch (error) {
+    console.error('Update Slots Error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update availability slots' });
+  }
+};
+
+export const bookMeetingSlot = async (req, res) => {
+  const { startupId, slotId } = req.body;
+
+  try {
+    const investorId = req.user._id;
+
+    const startup = await Startup.findOneAndUpdate(
+      { _id: startupId, 'availabilitySlots._id': slotId },
+      { $pull: { availabilitySlots: { _id: slotId } } },
+      { returnDocument: 'before' } 
+    );
+
+    if (!startup) {
+      return res.status(400).json({ success: false, message: 'Too late! Slot is no longer available.' });
+    }
+
+    const deletedSlot = startup.availabilitySlots.id(slotId);
+    
+    const customRoomId = uuidv4();
+    const frontendBaseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const meetingUrl = `${frontendBaseUrl}/meeting/${customRoomId}`;
+
+    const meeting = await Meeting.create({
+      hostId: startup.founderId,
+      investorId,
+      startupId: startup._id,
+      roomId: customRoomId,
+      meetingUrl: meetingUrl,
+      scheduledAt: deletedSlot.startTime,
+      duration: Math.round((new Date(deletedSlot.endTime) - new Date(deletedSlot.startTime)) / 60000),
+      status: 'scheduled'
+    });
+
+    try {
+      const investor = await User.findById(investorId).lean();
+      const founder = await User.findById(startup.founderId).lean();
+      
+      if (investor?.email && founder?.email) {
+        await createCalendarInvite(investor.email, founder.email, meeting.scheduledAt, meetingUrl);
+      }
+    } catch (calendarError) {
+      console.error(`[Calendar API Error]: ${calendarError.message} - Keys missing or invalid.`);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Slot claimed and removed from public availability!',
+      meeting
+    });
+  } catch (error) {
+    console.error('Booking Error:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error during booking.' });
+  }
+};
+
 export const requestMeeting = async (req, res) => {
   try {
     const { startupId, scheduledAt } = req.body;

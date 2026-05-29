@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
-
 import Startup from '../models/Startup.js';
 import cloudinary from '../config/cloudinary.js';
 
@@ -75,7 +74,6 @@ const updateNumberFields = (target, source, allowedFields) => {
   allowedFields.forEach((field) => {
     if (source[field] !== undefined) {
       const value = Number(source[field]);
-
       if (!Number.isNaN(value)) {
         target[field] = value;
       }
@@ -97,7 +95,6 @@ const calculatePitchCompleted = (startup) => {
   );
 };
 
-// simulate mca api call for cin verification
 const verifyMCAStatus = async (cin) => {
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -112,9 +109,6 @@ const verifyMCAStatus = async (cin) => {
   });
 };
 
-// @desc    Founder creates startup
-// @route   POST /api/startups
-// @access  founder
 export const createStartup = async (req, res) => {
   try {
     const {
@@ -174,7 +168,6 @@ export const createStartup = async (req, res) => {
       });
     }
 
-    // verify cin with mca before creating
     const mcaResponse = await verifyMCAStatus(normalizedCin);
     
     if (!mcaResponse.verified) {
@@ -222,9 +215,6 @@ export const createStartup = async (req, res) => {
   }
 };
 
-// @desc    Get logged-in founder startup
-// @route   GET /api/startups/my
-// @access  founder
 export const getMyStartup = async (req, res) => {
   try {
     if (req.user.role !== 'founder') {
@@ -259,9 +249,6 @@ export const getMyStartup = async (req, res) => {
   }
 };
 
-// @desc    Get startups
-// @route   GET /api/startups
-// @access  investor / founder / admin
 export const getStartups = async (req, res) => {
   try {
     const filter = {};
@@ -293,9 +280,6 @@ export const getStartups = async (req, res) => {
   }
 };
 
-// @desc    Get single startup by ID
-// @route   GET /api/startups/:id
-// @access  protected
 export const getStartupById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -350,9 +334,6 @@ export const getStartupById = async (req, res) => {
   }
 };
 
-// @desc    Founder updates own startup basic details
-// @route   PUT /api/startups/my
-// @access  founder
 export const updateMyStartup = async (req, res) => {
   try {
     if (req.user.role !== 'founder') {
@@ -424,9 +405,6 @@ export const updateMyStartup = async (req, res) => {
   }
 };
 
-// @desc    Generate Cloudinary signature for pitch deck upload
-// @route   POST /api/startups/:id/pitch-deck/signature
-// @access  founder
 export const createPitchDeckSignature = async (req, res) => {
   try {
     const { id } = req.params;
@@ -535,9 +513,6 @@ export const createPitchDeckSignature = async (req, res) => {
   }
 };
 
-// @desc    Founder updates startup pitch, investment details, and pitch deck metadata
-// @route   PUT /api/startups/:id/pitch
-// @access  founder
 export const updateStartupPitch = async (req, res) => {
   try {
     const { id } = req.params;
@@ -651,10 +626,6 @@ export const updateStartupPitch = async (req, res) => {
     startup.pitchCompleted = calculatePitchCompleted(startup);
     startup.pitchUpdatedAt = new Date();
 
-    /*
-      Pitch data is investor-facing.
-      If founder changes pitch, admin should approve again.
-    */
     startup.isLive = false;
     startup.mcaStatus = 'Pending';
 
@@ -675,9 +646,6 @@ export const updateStartupPitch = async (req, res) => {
   }
 };
 
-// @desc    Get startup pitch details
-// @route   GET /api/startups/:id/pitch
-// @access  founder / investor / admin
 export const getStartupPitch = async (req, res) => {
   try {
     const { id } = req.params;
@@ -734,7 +702,8 @@ export const getStartupPitch = async (req, res) => {
         pitchDeckUrl: startup.pitchDeckUrl,
         pitchVideoUrl: startup.pitchVideoUrl,
         pitchCompleted: startup.pitchCompleted,
-        pitchUpdatedAt: startup.pitchUpdatedAt
+        pitchUpdatedAt: startup.pitchUpdatedAt,
+        availabilitySlots: startup.availabilitySlots
       }
     });
   } catch (error) {
@@ -747,9 +716,6 @@ export const getStartupPitch = async (req, res) => {
   }
 };
 
-// @desc    Admin makes startup live
-// @route   PATCH /api/startups/:id/verify
-// @access  admin
 export const verifyStartup = async (req, res) => {
   try {
     const { id } = req.params;
@@ -813,9 +779,6 @@ export const verifyStartup = async (req, res) => {
   }
 };
 
-// @desc    Admin removes startup from live listing
-// @route   PATCH /api/startups/:id/unverify
-// @access  admin
 export const unverifyStartup = async (req, res) => {
   try {
     const { id } = req.params;
@@ -863,9 +826,6 @@ export const unverifyStartup = async (req, res) => {
   }
 };
 
-// @desc    Admin deletes startup
-// @route   DELETE /api/startups/:id
-// @access  admin
 export const deleteStartup = async (req, res) => {
   try {
     const { id } = req.params;

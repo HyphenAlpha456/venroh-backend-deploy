@@ -254,6 +254,15 @@ const startupSchema = new mongoose.Schema(
       default: null
     },
 
+    availabilitySlots: [
+      {
+        startTime: { type: Date, required: true },
+        endTime: { type: Date, required: true },
+        status: { type: String, enum: ['available', 'booked'], default: 'available' },
+        bookedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
+      }
+    ],
+
     isLive: {
       type: Boolean,
       default: false
