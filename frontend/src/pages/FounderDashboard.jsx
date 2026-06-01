@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, useReducer } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
@@ -6,73 +6,62 @@ const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 const Icons = {
-  LayoutDashboard: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
-  Briefcase: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg>,
-  Calendar: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>,
-  MessageSquare: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
-  Settings: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
-  UploadCloud: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>,
-  Trash2: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
-  Plus: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
-  Send: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>,
-  CheckCircle: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>,
-  XCircle: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>,
-  Video: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>,
-  FileText: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>,
-  Clock: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-  DollarSign: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
-  Activity: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
-  Users: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-  TrendingUp: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
-  ChevronRight: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>,
-  ChevronLeft: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
-  Download: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
-  Eye: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
-  Link: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
-  Paperclip: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>,
-  MoreVertical: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>,
-  Shield: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2-1 4-2 7-2 2.5 0 4.5 1 7 2a1 1 0 0 1 1 1v7Z"/></svg>,
-  Phone: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
-  CreditCard: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>,
-  GitMerge: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>,
-  Filter: (p) => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+  LayoutDashboard: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
+  Briefcase: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg>,
+  Calendar: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>,
+  MessageSquare: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  Settings: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+  UploadCloud: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>,
+  Trash2: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+  Plus: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+  Send: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>,
+  CheckCircle: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>,
+  XCircle: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>,
+  Video: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>,
+  FileText: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>,
+  Clock: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  DollarSign: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  Activity: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+  Users: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  TrendingUp: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
+  ChevronRight: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>,
+  ChevronLeft: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>,
+  Shield: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2-1 4-2 7-2 2.5 0 4.5 1 7 2a1 1 0 0 1 1 1v7Z"/></svg>,
+  Paperclip: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>,
+  Link: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+  ExternalLink: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>,
+  VideoPlus: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 16v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/><path d="m22 8-6 4 6 4V8Z"/></svg>,
+  MoreVertical: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>,
+  Phone: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
 };
 
-const cx = (...classes) => classes.filter(Boolean).join(' ');
-const formatCurrency = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
-const formatDate = (date) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(date));
-const formatTime = (date) => new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' }).format(new Date(date));
-const formatBytes = (bytes, decimals = 2) => {
-  if (!+bytes) return '0 Bytes';
-  const k = 1024, dm = decimals < 0 ? 0 : decimals, sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'], i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+const cx = (...c) => c.filter(Boolean).join(' ');
+const formatCurrency = v => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
+const formatBytes = b => { if (!+b) return '0 B'; const k=1024, i=Math.floor(Math.log(b)/Math.log(k)); return `${parseFloat((b/Math.pow(k,i)).toFixed(2))} ${['B','KB','MB','GB','TB'][i]}`; };
+const fD = d => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date(d));
+const fT = d => new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' }).format(new Date(d));
+
+const useToast = () => {
+  const [t, setT] = useState([]);
+  const add = useCallback((m, y = 'info', d = 5000) => { const i = Math.random().toString(36).slice(2,9); setT(p => [...p, {id:i,m,y}]); setTimeout(() => rem(i), d); }, []);
+  const rem = useCallback(i => setT(p => p.filter(x => x.id !== i)), []);
+  return { t, add, rem };
 };
 
-const useToastQueue = () => {
-  const [toasts, setToasts] = useState([]);
-  const addToast = useCallback((message, type = 'info', duration = 5000) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => removeToast(id), duration);
-  }, []);
-  const removeToast = useCallback((id) => setToasts((prev) => prev.filter((t) => t.id !== id)), []);
-  return { toasts, addToast, removeToast };
-};
-
-const ToastContainer = ({ toasts, removeToast }) => (
-  <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
-    {toasts.map((toast) => (
-      <div key={toast.id} className={cx('pointer-events-auto flex items-center gap-3 px-6 py-4 rounded-xl border backdrop-blur-md shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300', toast.type === 'success' ? 'bg-emerald-900/40 border-emerald-500/50 text-emerald-100' : toast.type === 'error' ? 'bg-rose-900/40 border-rose-500/50 text-rose-100' : 'bg-blue-900/40 border-blue-500/50 text-blue-100')}>
-        {toast.type === 'success' ? <Icons.CheckCircle /> : toast.type === 'error' ? <Icons.XCircle /> : <Icons.Activity />}
-        <p className="font-medium text-sm">{toast.message}</p>
-        <button onClick={() => removeToast(toast.id)} className="ml-4 opacity-50 hover:opacity-100 transition-opacity"><Icons.XCircle /></button>
+const Toasts = ({ t, rem }) => (
+  <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none">
+    {t.map(x => (
+      <div key={x.id} className={cx('pointer-events-auto flex items-center gap-3 px-6 py-4 rounded-xl border backdrop-blur-md shadow-2xl animate-in slide-in-from-bottom-5 duration-300', x.y === 'success' ? 'bg-emerald-900/40 border-emerald-500/50 text-emerald-100' : x.y === 'error' ? 'bg-rose-900/40 border-rose-500/50 text-rose-100' : 'bg-blue-900/40 border-blue-500/50 text-blue-100')}>
+        {x.y === 'success' ? <Icons.CheckCircle /> : x.y === 'error' ? <Icons.XCircle /> : <Icons.Activity />}
+        <p className="font-medium text-sm">{x.m}</p>
+        <button onClick={() => rem(x.id)} className="ml-4 opacity-50 hover:opacity-100 transition-opacity"><Icons.XCircle /></button>
       </div>
     ))}
   </div>
 );
 
-const Card = ({ children, className, title, icon: Icon, action }) => (
-  <div className={cx("bg-[#0B0F19]/80 backdrop-blur-md border border-gray-800 rounded-2xl shadow-xl overflow-hidden", className)}>
+const Card = ({ children, c, title, icon: Icon, action }) => (
+  <div className={cx("bg-[#0B0F19]/80 backdrop-blur-md border border-gray-800 rounded-2xl shadow-xl overflow-hidden", c)}>
     {(title || Icon || action) && (
       <div className="px-6 py-5 border-b border-gray-800/60 flex items-center justify-between bg-gray-900/20">
         <div className="flex items-center gap-3">
@@ -111,21 +100,14 @@ const InputGroup = ({ label, type = "text", name, value, onChange, placeholder, 
 const FileUploadZone = ({ onFileSelect, isUploading, currentFile, accept, label, subLabel }) => {
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef(null);
-  const handleDrag = useCallback((e) => {
-    e.preventDefault(); e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') setIsDragActive(true);
-    else if (e.type === 'dragleave') setIsDragActive(false);
-  }, []);
-  const handleDrop = useCallback((e) => {
-    e.preventDefault(); e.stopPropagation(); setIsDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) onFileSelect(e.dataTransfer.files[0]);
-  }, [onFileSelect]);
+  const handleDrag = useCallback(e => { e.preventDefault(); e.stopPropagation(); if (e.type === 'dragenter' || e.type === 'dragover') setIsDragActive(true); else if (e.type === 'dragleave') setIsDragActive(false); }, []);
+  const handleDrop = useCallback(e => { e.preventDefault(); e.stopPropagation(); setIsDragActive(false); if (e.dataTransfer.files && e.dataTransfer.files[0]) onFileSelect(e.dataTransfer.files[0]); }, [onFileSelect]);
 
   return (
     <div className="w-full">
       <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider ml-1 mb-2 block">{label}</label>
       <div onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop} onClick={() => !isUploading && fileInputRef.current?.click()} className={cx("relative overflow-hidden group border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all duration-300 min-h-[200px]", isDragActive ? "border-blue-500 bg-blue-900/10 scale-[1.02]" : "border-gray-700 hover:border-gray-500 bg-gray-900/20", isUploading ? "cursor-wait opacity-80" : "cursor-pointer")}>
-        <input ref={fileInputRef} type="file" accept={accept} onChange={(e) => e.target.files?.[0] && onFileSelect(e.target.files[0])} className="hidden" disabled={isUploading} />
+        <input ref={fileInputRef} type="file" accept={accept} onChange={e => e.target.files?.[0] && onFileSelect(e.target.files[0])} className="hidden" disabled={isUploading} />
         {isUploading ? (
           <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
             <div className="w-16 h-16 rounded-full border-4 border-blue-900/50 border-t-blue-500 animate-spin mb-4"></div>
@@ -149,64 +131,18 @@ const FileUploadZone = ({ onFileSelect, isUploading, currentFile, accept, label,
   );
 };
 
-const NativeLineChart = ({ data = [], height = 250, color = "#3b82f6", fillArea = true }) => {
-  if (!data || data.length === 0) return <div className="h-full w-full flex items-center justify-center text-gray-600">No telemetry data</div>;
-  const padding = 20;
-  const maxVal = Math.max(...data.map(d => d.value), 10);
-  const minVal = 0;
-  const generatePath = () => data.map((d, i) => {
-    const x = padding + (i * ((100 - padding * 2) / (data.length - 1 || 1)));
-    const y = 100 - padding - (((d.value - minVal) / (maxVal - minVal)) * (100 - padding * 2));
-    return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-  }).join(' ');
-
+const NativeLineChart = ({ data = [], height = 250, color = "#3b82f6" }) => {
+  if (!data?.length) return <div className="h-full w-full flex items-center justify-center text-gray-600">No telemetry data</div>;
+  const p = 20, max = Math.max(...data.map(d => d.value), 10), min = 0;
+  const path = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${p + (i * ((100 - p * 2) / (data.length - 1 || 1)))} ${100 - p - (((d.value - min) / (max - min)) * (100 - p * 2))}`).join(' ');
   return (
     <div className="w-full relative group" style={{ height }}>
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
-        <defs>
-          <linearGradient id={`grad-${color}`} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.4" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[0, 0.25, 0.5, 0.75, 1].map(ratio => (
-          <line key={ratio} x1={padding} y1={padding + (ratio * (100 - padding * 2))} x2={100 - padding} y2={padding + (ratio * (100 - padding * 2))} stroke="#1f2937" strokeWidth="0.5" strokeDasharray="2 2" />
-        ))}
-        {fillArea && <path d={`${generatePath()} L ${100-padding} ${100-padding} L ${padding} ${100-padding} Z`} fill={`url(#grad-${color})`} className="animate-in fade-in duration-1000" />}
-        <path d={generatePath()} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-in fade-in duration-700" style={{ filter: `drop-shadow(0 4px 6px ${color}40)` }} />
-        {data.map((d, i) => {
-          const x = padding + (i * ((100 - padding * 2) / (data.length - 1 || 1)));
-          const y = 100 - padding - (((d.value - minVal) / (maxVal - minVal)) * (100 - padding * 2));
-          return <circle key={i} cx={x} cy={y} r="1.5" fill="#0B0F19" stroke={color} strokeWidth="1" className="transition-all duration-300 hover:r-[3] cursor-pointer" />;
-        })}
-      </svg>
-      <div className="absolute bottom-0 left-0 w-full flex justify-between px-5 text-[10px] text-gray-500 font-mono">
-        {data.map((d, i) => (i % Math.ceil(data.length / 6) === 0 ? <span key={i}>{d.label}</span> : null))}
-      </div>
-    </div>
-  );
-};
-
-const NativeBarChart = ({ data = [], height = 250, color = "#10b981" }) => {
-  if (!data || data.length === 0) return <div className="h-full w-full flex items-center justify-center text-gray-600">No telemetry data</div>;
-  const padding = 20;
-  const maxVal = Math.max(...data.map(d => d.value), 10);
-  const barWidth = ((100 - padding * 2) / data.length) * 0.6;
-  
-  return (
-    <div className="w-full relative group" style={{ height }}>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
-        {[0, 0.25, 0.5, 0.75, 1].map(ratio => (
-          <line key={ratio} x1={padding} y1={padding + (ratio * (100 - padding * 2))} x2={100 - padding} y2={padding + (ratio * (100 - padding * 2))} stroke="#1f2937" strokeWidth="0.5" strokeDasharray="2 2" />
-        ))}
-        {data.map((d, i) => {
-          const x = padding + (i * ((100 - padding * 2) / data.length)) + (((100 - padding * 2) / data.length) - barWidth) / 2;
-          const barHeight = ((d.value / maxVal) * (100 - padding * 2));
-          const y = 100 - padding - barHeight;
-          return (
-            <rect key={i} x={x} y={y} width={barWidth} height={barHeight} fill={color} rx="1" className="animate-in fade-in slide-in-from-bottom-5 duration-700 hover:brightness-125 cursor-pointer transition-all" style={{ animationDelay: `${i * 50}ms` }} />
-          );
-        })}
+        <defs><linearGradient id={`grad-${color}`} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity="0.4" /><stop offset="100%" stopColor={color} stopOpacity="0" /></linearGradient></defs>
+        {[0, 0.25, 0.5, 0.75, 1].map(r => <line key={r} x1={p} y1={p + (r * (100 - p * 2))} x2={100 - p} y2={p + (r * (100 - p * 2))} stroke="#1f2937" strokeWidth="0.5" strokeDasharray="2 2" />)}
+        <path d={`${path} L ${100-p} ${100-p} L ${p} ${100-p} Z`} fill={`url(#grad-${color})`} className="animate-in fade-in duration-1000" />
+        <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-in fade-in duration-700" />
+        {data.map((d, i) => <circle key={i} cx={p + (i * ((100 - p * 2) / (data.length - 1 || 1)))} cy={100 - p - (((d.value - min) / (max - min)) * (100 - p * 2))} r="1.5" fill="#0B0F19" stroke={color} strokeWidth="1" className="hover:r-[3] transition-all cursor-pointer" />)}
       </svg>
       <div className="absolute bottom-0 left-0 w-full flex justify-between px-5 text-[10px] text-gray-500 font-mono">
         {data.map((d, i) => (i % Math.ceil(data.length / 6) === 0 ? <span key={i}>{d.label}</span> : null))}
@@ -223,9 +159,7 @@ const CalendarGrid = ({ slots, onAddSlot, onRemoveSlot }) => {
     const start = new Date(currentWeek);
     start.setDate(start.getDate() - start.getDay());
     return Array.from({ length: 7 }).map((_, i) => {
-      const d = new Date(start);
-      d.setDate(d.getDate() + i);
-      return d;
+      const d = new Date(start); d.setDate(d.getDate() + i); return d;
     });
   }, [currentWeek]);
 
@@ -238,14 +172,12 @@ const CalendarGrid = ({ slots, onAddSlot, onRemoveSlot }) => {
   }).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
 
   return (
-    <div className="bg-[#0F1423] border border-gray-800 rounded-2xl overflow-hidden flex flex-col h-[600px] shadow-2xl">
+    <div className="bg-[#0F1423] border border-gray-800 rounded-2xl overflow-hidden flex flex-col h-[500px] shadow-2xl">
       <div className="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-900/50">
-        <h4 className="font-bold text-white flex items-center gap-2"><Icons.Calendar/> Schedule Matrix</h4>
+        <h4 className="font-bold text-white flex items-center gap-2"><Icons.Calendar/> Generate Availability Matrix</h4>
         <div className="flex items-center gap-4 bg-gray-900 rounded-lg p-1 border border-gray-800">
           <button onClick={prevWeek} className="p-1.5 hover:bg-gray-800 rounded-md text-gray-400 hover:text-white transition-colors"><Icons.ChevronLeft/></button>
-          <span className="text-sm font-semibold text-gray-200 min-w-[120px] text-center">
-            {days[0].toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} - {days[6].toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
-          </span>
+          <span className="text-sm font-semibold text-gray-200 min-w-[120px] text-center">{days[0].toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} - {days[6].toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}</span>
           <button onClick={nextWeek} className="p-1.5 hover:bg-gray-800 rounded-md text-gray-400 hover:text-white transition-colors"><Icons.ChevronRight/></button>
         </div>
       </div>
@@ -257,24 +189,18 @@ const CalendarGrid = ({ slots, onAddSlot, onRemoveSlot }) => {
             return (
               <div key={i} className="flex-1 border-r border-gray-800/50 last:border-r-0 flex flex-col">
                 <div className={cx("py-3 text-center border-b border-gray-800/50", isToday ? "bg-blue-900/20" : "")}>
-                  <p className={cx("text-xs font-semibold uppercase tracking-wider mb-1", isToday ? "text-blue-400" : "text-gray-500")}>
-                    {day.toLocaleDateString(undefined, {weekday: 'short'})}
-                  </p>
+                  <p className={cx("text-xs font-semibold uppercase tracking-wider mb-1", isToday ? "text-blue-400" : "text-gray-500")}>{day.toLocaleDateString(undefined, {weekday: 'short'})}</p>
                   <p className={cx("text-xl font-light", isToday ? "text-blue-100" : "text-gray-300")}>{day.getDate()}</p>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar bg-gray-900/10">
                   {daySlots.map(slot => (
                     <div key={slot._id || Math.random()} className={cx("p-2 rounded-lg border text-xs relative group flex flex-col gap-1 transition-all", slot.status === 'booked' ? 'bg-amber-900/20 border-amber-900/50' : 'bg-gray-800/50 border-gray-700 hover:border-blue-500/50')}>
-                      <span className={cx("font-mono", slot.status === 'booked' ? "text-amber-200" : "text-gray-300")}>{formatTime(slot.startTime)}</span>
-                      <span className={cx("font-mono", slot.status === 'booked' ? "text-amber-400" : "text-gray-500")}>{formatTime(slot.endTime)}</span>
-                      {slot.status !== 'booked' && (
-                        <button onClick={() => onRemoveSlot(slot)} className="absolute top-1 right-1 w-6 h-6 rounded bg-red-900/50 text-red-400 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all hover:bg-red-500 hover:text-white"><Icons.XCircle/></button>
-                      )}
+                      <span className={cx("font-mono", slot.status === 'booked' ? "text-amber-200" : "text-gray-300")}>{fT(slot.startTime)}</span>
+                      <span className={cx("font-mono", slot.status === 'booked' ? "text-amber-400" : "text-gray-500")}>{fT(slot.endTime)}</span>
+                      {slot.status !== 'booked' && <button onClick={() => onRemoveSlot(slot)} className="absolute top-1 right-1 w-6 h-6 rounded bg-red-900/50 text-red-400 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all hover:bg-red-500 hover:text-white"><Icons.XCircle/></button>}
                     </div>
                   ))}
-                  <button onClick={() => setSelectedDate(day)} className="w-full py-2 border-2 border-dashed border-gray-700 rounded-lg text-gray-500 hover:text-blue-400 hover:border-blue-500/50 hover:bg-blue-900/10 transition-all flex items-center justify-center">
-                    <Icons.Plus />
-                  </button>
+                  <button onClick={() => setSelectedDate(day)} className="w-full py-2 border-2 border-dashed border-gray-700 rounded-lg text-gray-500 hover:text-blue-400 hover:border-blue-500/50 hover:bg-blue-900/10 transition-all flex items-center justify-center"><Icons.Plus /></button>
                 </div>
               </div>
             );
@@ -285,7 +211,7 @@ const CalendarGrid = ({ slots, onAddSlot, onRemoveSlot }) => {
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 animate-in fade-in duration-200">
           <div className="bg-[#0B0F19] border border-gray-700 rounded-2xl p-6 w-[400px] shadow-2xl animate-in zoom-in-95 duration-200">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Icons.Calendar/> Add Slot: {selectedDate.toLocaleDateString()}</h3>
-            <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.target); onAddSlot({ date: selectedDate, startTime: fd.get('start'), endTime: fd.get('end') }); setSelectedDate(null); }} className="space-y-4">
+            <form onSubmit={e => { e.preventDefault(); const fd = new FormData(e.target); onAddSlot({ date: selectedDate, startTime: fd.get('start'), endTime: fd.get('end') }); setSelectedDate(null); }} className="space-y-4">
               <InputGroup label="Start Time (UTC)" name="start" type="time" required />
               <InputGroup label="End Time (UTC)" name="end" type="time" required />
               <div className="flex gap-3 pt-4">
@@ -300,123 +226,8 @@ const CalendarGrid = ({ slots, onAddSlot, onRemoveSlot }) => {
   );
 };
 
-const KanbanBoard = () => {
-  const [columns] = useState([
-    { id: 'new', title: 'New Leads', color: 'bg-blue-500' },
-    { id: 'pitching', title: 'Pitching', color: 'bg-purple-500' },
-    { id: 'dd', title: 'Due Diligence', color: 'bg-amber-500' },
-    { id: 'term', title: 'Term Sheet', color: 'bg-emerald-500' }
-  ]);
-  const [cards, setCards] = useState([
-    { id: '1', colId: 'new', title: 'Sequoia Capital', amt: '₹50M', date: '2d ago' },
-    { id: '2', colId: 'pitching', title: 'Lightspeed', amt: '₹20M', date: '5d ago' },
-    { id: '3', colId: 'dd', title: 'Accel Partners', amt: '₹100M', date: '1w ago' }
-  ]);
-
-  const handleDragStart = (e, cardId) => e.dataTransfer.setData('cardId', cardId);
-  const handleDrop = (e, colId) => {
-    e.preventDefault();
-    const cardId = e.dataTransfer.getData('cardId');
-    setCards(cards.map(c => c.id === cardId ? { ...c, colId } : c));
-  };
-  const handleDragOver = (e) => e.preventDefault();
-
-  return (
-    <div className="flex gap-6 overflow-x-auto pb-4 custom-scrollbar h-[600px]">
-      {columns.map(col => (
-        <div key={col.id} onDrop={(e) => handleDrop(e, col.id)} onDragOver={handleDragOver} className="flex-1 min-w-[300px] bg-[#0B0F19]/80 border border-gray-800 rounded-2xl flex flex-col shadow-lg backdrop-blur-md">
-          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-            <div className="flex items-center gap-2"><div className={cx("w-3 h-3 rounded-full", col.color)}></div><h4 className="font-bold text-white tracking-wide">{col.title}</h4></div>
-            <span className="text-xs font-mono text-gray-500 bg-gray-900 px-2 py-1 rounded-md border border-gray-800">{cards.filter(c => c.colId === col.id).length}</span>
-          </div>
-          <div className="flex-1 p-4 space-y-4 overflow-y-auto custom-scrollbar">
-            {cards.filter(c => c.colId === col.id).map(card => (
-              <div key={card.id} draggable onDragStart={(e) => handleDragStart(e, card.id)} className="bg-[#0F1423] border border-gray-700 p-4 rounded-xl cursor-grab active:cursor-grabbing hover:border-gray-500 transition-colors shadow-md group">
-                <div className="flex justify-between items-start mb-3">
-                  <h5 className="font-bold text-gray-200">{card.title}</h5>
-                  <button className="text-gray-600 hover:text-white transition-colors opacity-0 group-hover:opacity-100"><Icons.MoreVertical/></button>
-                </div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="bg-emerald-900/30 text-emerald-400 text-[10px] font-mono px-2 py-1 rounded-md border border-emerald-500/20">{card.amt}</span>
-                  <span className="bg-blue-900/30 text-blue-400 text-[10px] font-mono px-2 py-1 rounded-md border border-blue-500/20">Equity</span>
-                </div>
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-800 text-xs text-gray-500">
-                  <div className="flex items-center gap-1.5"><Icons.Clock width="12" height="12"/> {card.date}</div>
-                  <div className="flex items-center gap-1.5"><Icons.MessageSquare width="12" height="12"/> 2</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const WalletLedger = () => {
-  const txs = [
-    { id: 'TX-1092', type: 'Deposit', entity: 'Accel Partners', amt: 10000000, date: '2026-05-28', status: 'Cleared' },
-    { id: 'TX-1091', type: 'Escrow Lock', entity: 'Sequoia', amt: 5000000, date: '2026-05-25', status: 'Pending' },
-    { id: 'TX-1090', type: 'Platform Fee', entity: 'VenRoh System', amt: -25000, date: '2026-05-20', status: 'Cleared' },
-    { id: 'TX-1089', type: 'Deposit', entity: 'Angel Syndicate', amt: 2000000, date: '2026-05-15', status: 'Cleared' }
-  ];
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-blue-900 to-[#0B0F19] border border-blue-500/30 rounded-2xl p-6 shadow-[0_0_30px_rgba(37,99,235,0.15)] relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl"></div>
-          <h4 className="text-blue-400 text-xs font-bold uppercase tracking-widest mb-1 flex items-center gap-2"><Icons.CreditCard width="16" height="16"/> Available Escrow Balance</h4>
-          <p className="text-4xl font-black text-white mt-2 font-mono">₹12,000,000</p>
-          <div className="mt-6 flex gap-3">
-            <button className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-xl text-sm transition-all shadow-lg">Withdraw to Bank</button>
-            <button className="w-12 h-12 bg-blue-900/50 border border-blue-500/50 rounded-xl flex items-center justify-center text-blue-400 hover:bg-blue-900 transition-colors"><Icons.Settings width="18" height="18"/></button>
-          </div>
-        </div>
-        <div className="bg-[#0B0F19]/80 backdrop-blur-md border border-gray-800 rounded-2xl p-6 shadow-xl col-span-2 flex flex-col justify-center">
-          <h4 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2"><Icons.Activity width="16" height="16"/> Escrow Metrics</h4>
-          <div className="grid grid-cols-3 gap-4">
-            <div><p className="text-sm text-gray-500 mb-1">Total Locked</p><p className="text-xl font-bold text-amber-400 font-mono">₹5,000,000</p></div>
-            <div><p className="text-sm text-gray-500 mb-1">YTD Cleared</p><p className="text-xl font-bold text-emerald-400 font-mono">₹12,000,000</p></div>
-            <div><p className="text-sm text-gray-500 mb-1">Active Mandates</p><p className="text-xl font-bold text-purple-400 font-mono">3</p></div>
-          </div>
-        </div>
-      </div>
-      <Card title="Ledger & Transaction History" icon={Icons.FileText}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-gray-800 text-xs uppercase tracking-widest text-gray-500">
-                <th className="py-4 font-semibold">Transaction ID</th>
-                <th className="py-4 font-semibold">Date</th>
-                <th className="py-4 font-semibold">Type</th>
-                <th className="py-4 font-semibold">Counterparty</th>
-                <th className="py-4 font-semibold text-right">Amount</th>
-                <th className="py-4 font-semibold text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {txs.map((tx, i) => (
-                <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-gray-900/30 transition-colors">
-                  <td className="py-4 font-mono text-sm text-gray-300">{tx.id}</td>
-                  <td className="py-4 text-sm text-gray-400">{tx.date}</td>
-                  <td className="py-4 text-sm text-gray-300">{tx.type}</td>
-                  <td className="py-4 text-sm font-semibold text-white">{tx.entity}</td>
-                  <td className={cx("py-4 text-sm font-mono text-right font-bold", tx.amt > 0 ? "text-emerald-400" : "text-rose-400")}>{tx.amt > 0 ? '+' : ''}{formatCurrency(tx.amt)}</td>
-                  <td className="py-4 text-center">
-                    <span className={cx("text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded-md border", tx.status === 'Cleared' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/20' : 'bg-amber-900/30 text-amber-400 border-amber-500/20')}>{tx.status}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </div>
-  );
-};
-
 export default function FounderDashboard({ token }) {
-  const { toasts, addToast, removeToast } = useToastQueue();
+  const { t: toasts, add: addToast, rem: removeToast } = useToast();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -424,13 +235,16 @@ export default function FounderDashboard({ token }) {
   const [startupId, setStartupId] = useState(null);
   const [isLive, setIsLive] = useState(false);
   const [mcaStatus, setMcaStatus] = useState('Pending');
-  const [analytics, setAnalytics] = useState({ views: [], engagement: [], conversions: [] });
+  const [analytics, setAnalytics] = useState({ views: [], engagement: [] });
   
   const [pitchData, setPitchData] = useState({ companyName: '', cin: '', oneLinePitch: '', problem: '', solution: '', targetMarket: '', businessModel: '', traction: '', competitors: '', uniqueValue: '', teamOverview: '', futurePlan: '', risks: '' });
   const [investmentData, setInvestmentData] = useState({ fundingStage: '', amountRequired: '', equityOffered: '', valuationAsk: '', minimumInvestment: '', useOfFunds: '', expectedROI: '' });
   const [mediaData, setMediaData] = useState({ pitchDeckUrl: '', pitchVideoUrl: '', pitchDeck: null });
   const [availabilitySlots, setAvailabilitySlots] = useState([]);
   
+  const [meetings, setMeetings] = useState([]);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
   const [socket, setSocket] = useState(null);
   const [chatContacts, setChatContacts] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
@@ -439,6 +253,11 @@ export default function FounderDashboard({ token }) {
   const [typingStatus, setTypingStatus] = useState({});
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef({});
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   const fetchInitialData = useCallback(async () => {
     if (!token) return;
@@ -457,8 +276,7 @@ export default function FounderDashboard({ token }) {
         
         setAnalytics({
           views: Array.from({length: 14}).map((_,i) => ({ label: `Day ${i+1}`, value: Math.floor(Math.random() * 100) + 10 })),
-          engagement: Array.from({length: 14}).map((_,i) => ({ label: `Day ${i+1}`, value: Math.floor(Math.random() * 40) + 5 })),
-          conversions: Array.from({length: 14}).map((_,i) => ({ label: `Day ${i+1}`, value: Math.floor(Math.random() * 5) }))
+          engagement: Array.from({length: 14}).map((_,i) => ({ label: `Day ${i+1}`, value: Math.floor(Math.random() * 40) + 5 }))
         });
       }
     } catch (error) {
@@ -468,7 +286,17 @@ export default function FounderDashboard({ token }) {
     }
   }, [token, addToast]);
 
-  useEffect(() => { fetchInitialData(); }, [fetchInitialData]);
+  const fetchMeetings = useCallback(async () => {
+    if (!token) return;
+    try {
+      const { data } = await axios.get(`${SERVER_URL}/api/v1/meetings/upcoming`, { headers: { Authorization: `Bearer ${token}` } });
+      if (data.success) setMeetings(data.meetings);
+    } catch (error) {
+      console.error('Meetings fetch failed', error);
+    }
+  }, [token]);
+
+  useEffect(() => { fetchInitialData(); fetchMeetings(); }, [fetchInitialData, fetchMeetings]);
 
   useEffect(() => {
     if (token) {
@@ -489,9 +317,7 @@ export default function FounderDashboard({ token }) {
     }
   }, [token]);
 
-  useEffect(() => {
-    if (activeChat && messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, activeChat]);
+  useEffect(() => { if (activeChat && messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' }); }, [messages, activeChat]);
 
   const uploadToCloudinary = async (file) => {
     if (!startupId) { addToast('Initialize company profile prior to asset upload.', 'error'); return null; }
@@ -580,18 +406,9 @@ export default function FounderDashboard({ token }) {
     return <div className="min-h-screen bg-[#060913] flex flex-col items-center justify-center text-blue-500 space-y-6"><div className="w-16 h-16 border-4 border-blue-900/30 border-t-blue-500 rounded-full animate-spin"></div><h2 className="text-xl font-mono font-bold tracking-widest uppercase">Initializing Node</h2></div>;
   }
 
-  const tabs = [
-    { id: 'dashboard', icon: <Icons.LayoutDashboard/>, label: 'Command Center' },
-    { id: 'pitch', icon: <Icons.FileText/>, label: 'Architecture' },
-    { id: 'schedule', icon: <Icons.Calendar/>, label: 'Temporal Matrix' },
-    { id: 'chat', icon: <Icons.MessageSquare/>, label: 'Secure Comms' },
-    { id: 'dealflow', icon: <Icons.GitMerge/>, label: 'Deal Pipeline' },
-    { id: 'wallet', icon: <Icons.CreditCard/>, label: 'Escrow Ledger' }
-  ];
-
   return (
     <div className="min-h-screen bg-[#060913] text-gray-200 font-sans flex selection:bg-blue-500/30 overflow-hidden relative">
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <Toasts t={toasts} rem={removeToast} />
       
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none flex items-center justify-center">
         <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-blue-900/10 blur-[120px]"></div>
@@ -608,8 +425,13 @@ export default function FounderDashboard({ token }) {
             </div>
           </div>
         </div>
-        <nav className="flex-1 py-6 flex flex-col gap-1 px-3 overflow-y-auto custom-scrollbar">
-          {tabs.map(t => (
+        <nav className="flex-1 py-6 flex flex-col gap-1 px-3">
+          {[
+            { id: 'dashboard', icon: <Icons.LayoutDashboard/>, label: 'Command Center' },
+            { id: 'pitch', icon: <Icons.FileText/>, label: 'Architecture' },
+            { id: 'schedule', icon: <Icons.Calendar/>, label: 'Temporal Matrix' },
+            { id: 'chat', icon: <Icons.MessageSquare/>, label: 'Secure Comms' }
+          ].map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} className={cx("w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200", activeTab === t.id ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.2)]" : "text-gray-400 hover:bg-gray-800/50 hover:text-gray-200")}>
               <div className={activeTab === t.id ? "animate-pulse" : ""}>{t.icon}</div>
               <span className="font-semibold tracking-wide text-sm">{t.label}</span>
@@ -636,16 +458,16 @@ export default function FounderDashboard({ token }) {
           <header className="flex justify-between items-end animate-in slide-in-from-top-4 fade-in duration-500">
             <div>
               <h2 className="text-3xl font-extrabold text-white tracking-tight mb-2 flex items-center gap-3">
-                {tabs.find(t => t.id === activeTab)?.icon} 
-                <span className="ml-2">{tabs.find(t => t.id === activeTab)?.label}</span>
+                {activeTab === 'dashboard' && <><Icons.LayoutDashboard width="28" height="28" className="text-blue-500"/> System Overview</>}
+                {activeTab === 'pitch' && <><Icons.FileText width="28" height="28" className="text-blue-500"/> Core Architecture</>}
+                {activeTab === 'schedule' && <><Icons.Calendar width="28" height="28" className="text-blue-500"/> Temporal Control & Syncs</>}
+                {activeTab === 'chat' && <><Icons.MessageSquare width="28" height="28" className="text-blue-500"/> Encrypted Pipeline</>}
               </h2>
               <p className="text-gray-400 text-sm max-w-2xl leading-relaxed">
                 {activeTab === 'dashboard' && 'Real-time telemetry, valuation metrics, and system integrity status.'}
                 {activeTab === 'pitch' && 'Define identity parameters, financial algorithms, and deploy secure collateral.'}
-                {activeTab === 'schedule' && 'Manage atomic availability matrices for WebRTC synchronous execution.'}
+                {activeTab === 'schedule' && 'Manage atomic availability matrices and enter live WebRTC investor meetings.'}
                 {activeTab === 'chat' && 'End-to-end WebSocket communication protocol with authenticated entities.'}
-                {activeTab === 'dealflow' && 'Drag-and-drop pipeline management for active investor syndicates.'}
-                {activeTab === 'wallet' && 'Razorpay Escrow infrastructure. Real-time fund tracking and settlement.'}
               </p>
             </div>
             {activeTab === 'pitch' && (
@@ -668,21 +490,20 @@ export default function FounderDashboard({ token }) {
                   <div className="flex items-end gap-3"><p className="text-3xl font-black text-emerald-400">{formatCurrency(investmentData.valuationAsk)}</p></div>
                 </Card>
                 <Card className="md:col-span-1 border-t-4 border-t-purple-500">
-                  <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2"><Icons.Calendar width="14" height="14"/> Active Nodes</h3>
-                  <div className="flex items-end gap-3"><p className="text-3xl font-black text-purple-400">{availabilitySlots.filter(s=>s.status==='available').length}</p><span className="text-gray-500 font-mono text-sm mb-1">Slots</span></div>
+                  <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2"><Icons.VideoPlus width="14" height="14"/> Upcoming Syncs</h3>
+                  <div className="flex items-end gap-3"><p className="text-3xl font-black text-purple-400">{meetings.length}</p><span className="text-gray-500 font-mono text-sm mb-1">Meetings</span></div>
                 </Card>
                 <Card className="md:col-span-1 border-t-4 border-t-amber-500">
                   <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2"><Icons.Users width="14" height="14"/> Engagement</h3>
                   <div className="flex items-end gap-3"><p className="text-3xl font-black text-amber-400">{chatContacts.length}</p><span className="text-gray-500 font-mono text-sm mb-1">Entities</span></div>
                 </Card>
               </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <Card title="Traffic Telemetry" icon={Icons.TrendingUp} className="lg:col-span-2">
-                  <NativeLineChart data={analytics.views} color="#3b82f6" height={280} fillArea={true} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <Card title="Traffic Telemetry (14D)" icon={Icons.TrendingUp}>
+                  <NativeLineChart data={analytics.views} color="#3b82f6" height={280} />
                 </Card>
-                <Card title="Conversion Distribution" icon={Icons.Activity}>
-                  <NativeBarChart data={analytics.conversions} color="#10b981" height={280} />
+                <Card title="Interaction Vector (14D)" icon={Icons.Activity}>
+                  <NativeLineChart data={analytics.engagement} color="#10b981" height={280} />
                 </Card>
               </div>
             </div>
@@ -741,20 +562,63 @@ export default function FounderDashboard({ token }) {
           )}
 
           {activeTab === 'schedule' && (
-            <div className="animate-in fade-in duration-500">
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <Card title="Upcoming Investor Syncs" icon={Icons.VideoPlus}>
+                {meetings.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-gray-500 border-2 border-dashed border-gray-800 rounded-2xl bg-gray-900/20">
+                    <Icons.Video width="32" height="32" className="mb-4 opacity-50"/>
+                    <p className="font-semibold">No syncs scheduled yet.</p>
+                    <p className="text-sm text-gray-600 mt-1">Investors will book from your configured matrix below.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-800 text-xs uppercase tracking-widest text-gray-500">
+                          <th className="py-4 font-semibold pl-4">Investor Entity</th>
+                          <th className="py-4 font-semibold">Temporal Coordinates</th>
+                          <th className="py-4 font-semibold">Status</th>
+                          <th className="py-4 font-semibold text-right pr-4">Pipeline</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {meetings.map((m) => {
+                          const meetTime = new Date(m.scheduledAt);
+                          const canJoin = currentTime >= new Date(meetTime.getTime() - 5 * 60000).getTime();
+                          return (
+                            <tr key={m._id} className="border-b border-gray-800/50 hover:bg-gray-900/30 transition-colors">
+                              <td className="py-4 pl-4 font-bold text-white flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-blue-900/30 text-blue-400 flex items-center justify-center font-black border border-blue-500/20">{m.investorId?.name?.charAt(0) || 'I'}</div>
+                                {m.investorId?.name || 'Investor Identity Masked'}
+                              </td>
+                              <td className="py-4 text-sm text-gray-300 font-mono">
+                                <span className="text-blue-400 mr-2">{fD(m.scheduledAt)}</span> 
+                                {fT(m.scheduledAt)}
+                              </td>
+                              <td className="py-4">
+                                <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded border bg-emerald-900/20 text-emerald-400 border-emerald-500/20"><Icons.CheckCircle width="10" height="10" className="inline mr-1 -mt-0.5"/>Confirmed</span>
+                              </td>
+                              <td className="py-4 pr-4 text-right">
+                                {canJoin ? (
+                                  <a href={`/meeting/${m.roomId}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-500/20 hover:scale-105">
+                                    <Icons.Video width="14" height="14"/> Join Meet
+                                  </a>
+                                ) : (
+                                  <button disabled className="inline-flex items-center gap-2 bg-gray-800 text-gray-500 px-5 py-2.5 rounded-xl text-xs font-bold cursor-not-allowed border border-gray-700 transition-all">
+                                    <Icons.Clock width="14" height="14"/> Unlocks at {fT(m.scheduledAt)}
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+
               <CalendarGrid slots={availabilitySlots} onAddSlot={handleAddSlot} onRemoveSlot={handleRemoveSlot} />
-            </div>
-          )}
-
-          {activeTab === 'dealflow' && (
-            <div className="animate-in fade-in duration-500">
-              <KanbanBoard />
-            </div>
-          )}
-
-          {activeTab === 'wallet' && (
-            <div className="animate-in fade-in duration-500">
-              <WalletLedger />
             </div>
           )}
 
@@ -822,7 +686,7 @@ export default function FounderDashboard({ token }) {
                               <div className={cx("relative group rounded-2xl px-5 py-3.5", isMe ? "bg-blue-600 text-white rounded-br-sm shadow-[0_8px_25px_rgba(37,99,235,0.25)]" : "bg-gray-800 text-gray-200 rounded-bl-sm border border-gray-700 shadow-lg")}>
                                 <p className="text-sm leading-relaxed">{msg.content}</p>
                                 <div className={cx("absolute -bottom-5 text-[9px] font-mono whitespace-nowrap", isMe ? "right-1 text-gray-500" : "left-1 text-gray-500")}>
-                                  {formatTime(msg.timestamp)} {isMe && <Icons.CheckCircle width="10" height="10" className="inline ml-1 text-blue-400"/>}
+                                  {fT(msg.timestamp)} {isMe && <Icons.CheckCircle width="10" height="10" className="inline ml-1 text-blue-400"/>}
                                 </div>
                               </div>
                             </div>
