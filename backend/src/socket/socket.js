@@ -6,6 +6,8 @@ import Startup from '../models/Startup.js';
 import Conversation from '../models/Conversation.js';
 import Message from '../models/Message.js';
 
+let ioInstance;
+
 const getAllowedOrigins = () => {
   if (!process.env.ALLOWED_ORIGINS) {
     return ['http://localhost:5173'];
@@ -46,7 +48,6 @@ const normalizeSocketAttachments = (attachments = []) => {
 };
 
 export const initSocket = (server) => {
-  // Configured with WebSockets transport for ultra-low latency WebRTC
   const io = new Server(server, {
     cors: {
       origin: getAllowedOrigins(),
@@ -56,7 +57,8 @@ export const initSocket = (server) => {
     transports: ['websocket']
   });
 
-  // JWT Authentication Middleware
+  ioInstance = io;
+
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -88,13 +90,9 @@ export const initSocket = (server) => {
 
   io.on('connection', (socket) => {
     const userId = socket.user._id.toString();
-    console.log(`[Socket] Connected: ${socket.user.name} (${socket.id})`);
 
     socket.join(userId);
 
-    // ==========================================
-    // CHAT SYSTEM LOGIC
-    // ==========================================
     socket.on('join_conversation', async ({ conversationId }) => {
       try {
         if (!conversationId) {
@@ -117,7 +115,6 @@ export const initSocket = (server) => {
         socket.join(conversationId);
         socket.emit('joined_conversation', { conversationId });
       } catch (error) {
-        console.error('Join Conversation Socket Error:', error);
         socket.emit('chat_error', { message: 'Failed to join conversation' });
       }
     });
@@ -172,7 +169,7 @@ export const initSocket = (server) => {
 
         await Conversation.findByIdAndUpdate(conversationId, {
           lastMessage: message._id,
-          lastMessageText: text?.trim() || '📎 Attachment',
+          lastMessageText: text?.trim() || 'Attachment',
           updatedAt: new Date()
         });
 
@@ -183,7 +180,6 @@ export const initSocket = (server) => {
 
         io.to(conversationId).emit('receive_message', message);
       } catch (error) {
-        console.error('Send Message Socket Error:', error);
         socket.emit('chat_error', { message: 'Failed to send message' });
       }
     });
@@ -196,12 +192,8 @@ export const initSocket = (server) => {
       socket.to(conversationId).emit('stop_typing', { conversationId, userId });
     });
 
-    // ==========================================
-    // WEBRTC VIDEO SIGNALING LOGIC
-    // ==========================================
     socket.on('join-room', ({ roomId }) => {
       socket.join(roomId);
-      // Alert existing room members to initiate peer connections
       socket.to(roomId).emit('user-connected', socket.id);
     });
 
@@ -221,15 +213,17 @@ export const initSocket = (server) => {
       socket.to(roomId).emit('user-raised-hand', socket.id);
     });
 
-    // ==========================================
-    // GLOBAL DISCONNECT LOGIC
-    // ==========================================
     socket.on('disconnect', () => {
-      console.log(`[Socket] Disconnected: ${socket.user.name} (${socket.id})`);
-      // Broadcast to any WebRTC rooms this user was in
       socket.broadcast.emit('user-disconnected', socket.id);
     });
   });
 
   return io;
+};
+
+export const getIO = () => {
+  if (!ioInstance) {
+    throw new Error('Socket.io has not been initialized yet');
+  }
+  return ioInstance;
 };

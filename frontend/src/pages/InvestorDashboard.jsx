@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, useReducer } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
@@ -7,10 +7,8 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 const Icons = {
   Compass: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>,
-  PieChart: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>,
   Calendar: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>,
   MessageSquare: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
-  CreditCard: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>,
   Search: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
   Filter: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
   X: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
@@ -20,27 +18,26 @@ const Icons = {
   Send: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>,
   Video: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>,
   ExternalLink: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>,
-  TrendingUp: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
-  TrendingDown: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>,
   List: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
   Grid: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
   ArrowUpRight: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>,
-  ArrowDownLeft: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="17" y1="7" x2="7" y2="17"/><polyline points="17 17 7 17 7 7"/></svg>,
   Zap: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
   Globe: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
   Lock: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
-  Unlock: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>,
-  MoreVertical: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>,
   FileKey: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><circle cx="10" cy="13" r="2"/><line x1="12" y1="13" x2="16" y2="13"/><line x1="16" y1="13" x2="16" y2="15"/><line x1="14" y1="13" x2="14" y2="15"/></svg>,
   DownloadCloud: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>,
-  Clock: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+  Clock: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  Phone: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
+  MoreVertical: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>,
+  Paperclip: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>,
+  TrendingDown: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>,
+  PieChart: p => <svg {...p} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
 };
 
 const cx = (...c) => c.filter(Boolean).join(' ');
-const fC = v => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
-const fT = d => new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' }).format(new Date(d));
+const formatCurrency = v => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
 const fD = d => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date(d));
-const fB = b => { if (!+b) return '0 B'; const k=1024, i=Math.floor(Math.log(b)/Math.log(k)); return `${parseFloat((b/Math.pow(k,i)).toFixed(2))} ${['B','KB','MB','GB'][i]}`; };
+const fT = d => new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' }).format(new Date(d));
 const gI = (str) => { let hash = 0; for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash); return `hsl(${Math.abs(hash) % 360}, 70%, 60%)`; };
 
 const useToast = () => {
@@ -81,85 +78,6 @@ const Button = ({ c, children, onClick, disabled, v = 'primary' }) => {
   const base = "px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 outline-none disabled:opacity-50 disabled:cursor-not-allowed";
   const vars = { primary: "bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)] border border-indigo-500", secondary: "bg-gray-800 hover:bg-gray-700 text-white border border-gray-600", ghost: "bg-transparent hover:bg-white/5 text-gray-400 hover:text-white" };
   return <button onClick={onClick} disabled={disabled} className={cx(base, vars[v], c)}>{children}</button>;
-};
-
-const NativeDonut = ({ data, size = 200, sw = 20 }) => {
-  const total = data.reduce((a, c) => a + c.v, 0);
-  if (!total) return <div className="flex items-center justify-center h-full text-gray-600 font-mono text-sm">No Allocation Data</div>;
-  const c = size / 2, r = c - sw, circ = 2 * Math.PI * r;
-  let o = 0;
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="transform -rotate-90">
-        {data.map((s, i) => {
-          const d = (s.v / total) * circ, so = -o; o += d;
-          return <circle key={i} cx={c} cy={c} r={r} fill="transparent" stroke={s.c} strokeWidth={sw} strokeDasharray={`${d} ${circ}`} strokeDashoffset={so} className="transition-all duration-1000 ease-out hover:opacity-80 hover:stroke-[24px] cursor-pointer" />;
-        })}
-      </svg>
-      <div className="absolute flex flex-col items-center justify-center">
-        <span className="text-2xl font-black text-white">{fC(total)}</span>
-        <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mt-1">AUM</span>
-      </div>
-    </div>
-  );
-};
-
-const NativeLine = ({ data, h = 200, c = "#4f46e5", fill = true }) => {
-  if (!data?.length) return <div className="h-full w-full flex items-center justify-center text-gray-600">No telemetry</div>;
-  const p = 20, max = Math.max(...data.map(d => d.v), 10);
-  const path = data.map((d, i) => `${i===0?'M':'L'} ${p+(i*((100-p*2)/(data.length-1||1)))} ${100-p-((d.v/max)*(100-p*2))}`).join(' ');
-  return (
-    <div className="w-full relative group" style={{ height: h }}>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
-        <defs><linearGradient id={`g-${c}`} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={c} stopOpacity="0.4" /><stop offset="100%" stopColor={c} stopOpacity="0" /></linearGradient></defs>
-        {fill && <path d={`${path} L ${100-p} ${100-p} L ${p} ${100-p} Z`} fill={`url(#g-${c})`} className="animate-in fade-in duration-1000" />}
-        <path d={path} fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-in fade-in duration-700" />
-        {data.map((d, i) => <circle key={i} cx={p+(i*((100-p*2)/(data.length-1||1)))} cy={100-p-((d.v/max)*(100-p*2))} r="1.5" fill="#0B0F19" stroke={c} strokeWidth="1" className="hover:r-[3] transition-all cursor-pointer" />)}
-      </svg>
-      <div className="absolute bottom-0 left-0 w-full flex justify-between px-5 text-[10px] text-gray-500 font-mono">
-        {data.map((d, i) => (i % Math.ceil(data.length/5) === 0 ? <span key={i}>{d.l}</span> : null))}
-      </div>
-    </div>
-  );
-};
-
-const NativeBar = ({ data, h = 200, c = "#10b981" }) => {
-  if (!data?.length) return <div className="h-full w-full flex items-center justify-center text-gray-600">No telemetry</div>;
-  const p = 20, max = Math.max(...data.map(d => d.v), 10), bw = ((100-p*2)/data.length)*0.6;
-  return (
-    <div className="w-full relative group" style={{ height: h }}>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
-        {data.map((d, i) => {
-          const x = p+(i*((100-p*2)/data.length))+(((100-p*2)/data.length)-bw)/2, bh = (d.v/max)*(100-p*2), y = 100-p-bh;
-          return <rect key={i} x={x} y={y} width={bw} height={bh} fill={c} rx="1" className="animate-in fade-in slide-in-from-bottom-5 duration-700 hover:brightness-125 cursor-pointer transition-all" style={{ animationDelay: `${i*50}ms` }} />;
-        })}
-      </svg>
-      <div className="absolute bottom-0 left-0 w-full flex justify-between px-5 text-[10px] text-gray-500 font-mono">
-        {data.map((d, i) => (i % Math.ceil(data.length/5) === 0 ? <span key={i}>{d.l}</span> : null))}
-      </div>
-    </div>
-  );
-};
-
-const NativeRadar = ({ data, size = 250, c = "#8b5cf6" }) => {
-  const p = 30, cX = 50, cY = 50, r = 50 - p, max = 10;
-  const pts = data.map((d, i) => {
-    const a = (Math.PI * 2 * i) / data.length - Math.PI / 2;
-    return { x: cX + r * (d.v / max) * Math.cos(a), y: cY + r * (d.v / max) * Math.sin(a), lx: cX + (r + 15) * Math.cos(a), ly: cY + (r + 10) * Math.sin(a), l: d.l };
-  });
-  return (
-    <div className="w-full flex items-center justify-center relative" style={{ height: size }}>
-      <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
-        {[0.2, 0.4, 0.6, 0.8, 1].map(lvl => (
-          <polygon key={lvl} points={pts.map((_, i) => { const a = (Math.PI * 2 * i) / data.length - Math.PI / 2; return `${cX + r * lvl * Math.cos(a)},${cY + r * lvl * Math.sin(a)}`; }).join(' ')} fill="none" stroke="#1f2937" strokeWidth="0.5" strokeDasharray="1 1" />
-        ))}
-        {pts.map((_, i) => { const a = (Math.PI * 2 * i) / data.length - Math.PI / 2; return <line key={i} x1={cX} y1={cY} x2={cX + r * Math.cos(a)} y2={cY + r * Math.sin(a)} stroke="#1f2937" strokeWidth="0.5" />; })}
-        <polygon points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill={`${c}30`} stroke={c} strokeWidth="1.5" className="animate-in zoom-in duration-700" />
-        {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="1.5" fill="#0B0F19" stroke={c} strokeWidth="1" className="animate-in zoom-in duration-500 delay-300" />)}
-        {pts.map((p, i) => <text key={`t-${i}`} x={p.lx} y={p.ly} fontSize="4" fill="#6b7280" textAnchor="middle" dominantBaseline="middle" className="font-mono uppercase tracking-widest">{p.l}</text>)}
-      </svg>
-    </div>
-  );
 };
 
 const DataGrid = ({ cols, data, onRowClick }) => {
@@ -215,6 +133,7 @@ export default function InvestorDashboard({ token }) {
   const [isLoading, setIsLoading] = useState(false);
   const [startups, setStartups] = useState([]);
   const [meetings, setMeetings] = useState([]);
+  const [currentTime, setCurrentTime] = useState(Date.now());
   const [socket, setSocket] = useState(null);
   
   const [vdrStartup, setVdrStartup] = useState(null);
@@ -234,8 +153,11 @@ export default function InvestorDashboard({ token }) {
   const [search, setSearch] = useState('');
   const [stage, setStage] = useState('');
   const [view, setView] = useState('grid');
-  const [wizardStep, setWizardStep] = useState(0);
-  const [depositAmt, setDepositAmt] = useState('');
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   const fetchMatrix = useCallback(async () => {
     setIsLoading(true);
@@ -296,7 +218,7 @@ export default function InvestorDashboard({ token }) {
       if (data.success) {
         addToast('Atomic lock confirmed. WebRTC payload injected to calendar.', 'success');
         setVdrData(p => ({ ...p, availabilitySlots: p.availabilitySlots.filter(s => s._id !== slotId) }));
-        setSlotId(null); fetchSyncs();
+        setSlotId(null); fetchSyncs(); setTab('meetings'); setVdrStartup(null);
       }
     } catch (e) { addToast(e.response?.data?.message || 'Collision detected. Aborting.', 'error'); }
     finally { setIsBooking(false); }
@@ -326,28 +248,7 @@ export default function InvestorDashboard({ token }) {
     }
   };
 
-  const pData = [ { l: 'FinTech', v: 4500000, c: '#4f46e5' }, { l: 'Web3', v: 2000000, c: '#8b5cf6' }, { l: 'SaaS', v: 3500000, c: '#10b981' }, { l: 'Hardware', v: 1000000, c: '#f59e0b' } ];
-  const tData = Array.from({length: 30}).map((_,i) => ({ l: `${i+1}d`, v: Math.floor(Math.random()*100)+50+i*2 }));
-  const bData = Array.from({length: 12}).map((_,i) => ({ l: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][i], v: Math.floor(Math.random()*5)+1 }));
-  const rData = [ { l: 'Team', v: 8.5 }, { l: 'Market', v: 9.2 }, { l: 'Product', v: 7.8 }, { l: 'Traction', v: 6.5 }, { l: 'Moat', v: 8.0 } ];
-
-  const ledgerTxs = [
-    { id: 'TX-X91A', d: '2026-05-28T14:30:00Z', t: 'Deposit', e: 'Bank XYZ', a: 10000000, s: 'Cleared' },
-    { id: 'TX-X91B', d: '2026-05-25T09:15:00Z', t: 'Lock', e: 'Acme Corp', a: 2500000, s: 'Pending' },
-    { id: 'TX-X91C', d: '2026-05-20T16:45:00Z', t: 'Fee', e: 'Protocol', a: -12500, s: 'Cleared' },
-    { id: 'TX-X91D', d: '2026-05-15T11:00:00Z', t: 'Disbursement', e: 'TechFlow', a: -5000000, s: 'Cleared' },
-    { id: 'TX-X91E', d: '2026-05-10T10:20:00Z', t: 'Deposit', e: 'Syndicate', a: 5000000, s: 'Cleared' },
-  ];
-
-  const cols = [
-    { k: 'id', l: 'Tx Hash', render: r => <span className="font-mono text-gray-400 text-xs">{r.id}</span> },
-    { k: 'd', l: 'Timestamp', render: r => <span className="font-mono text-gray-300 text-xs">{fD(r.d)} {fT(r.d)}</span> },
-    { k: 't', l: 'Type', render: r => <span className="text-gray-200">{r.t}</span> },
-    { k: 'e', l: 'Counterparty', render: r => <span className="font-bold text-white">{r.e}</span> },
-    { k: 'a', l: 'Amount', align: 'right', render: r => <span className={cx("font-mono font-bold text-sm", r.a > 0 ? "text-emerald-400" : "text-rose-400")}>{r.a > 0 ? '+' : ''}{fC(r.a)}</span> },
-    { k: 's', l: 'Status', render: r => <span className={cx("text-[10px] uppercase font-mono tracking-widest px-2.5 py-1 rounded border", r.s === 'Cleared' ? 'bg-emerald-900/20 text-emerald-400 border-emerald-500/20' : 'bg-amber-900/20 text-amber-400 border-amber-500/20')}>{r.s}</span> }
-  ];
-
+  const rData = [ { l: 'Team', v: '8.5/10' }, { l: 'Market', v: '9.2/10' }, { l: 'Product', v: '7.8/10' }, { l: 'Traction', v: '6.5/10' }, { l: 'Moat', v: '8.0/10' } ];
   const discoveryData = startups.filter(s => s.companyName.toLowerCase().includes(search.toLowerCase()) && (stage ? s.investmentDetails?.fundingStage === stage : true));
 
   return (
@@ -374,10 +275,8 @@ export default function InvestorDashboard({ token }) {
         <nav className="flex-1 py-6 px-4 space-y-1.5 overflow-y-auto custom-scrollbar">
           {[
             { id: 'discovery', i: <Icons.Search/>, l: 'Discovery Matrix' },
-            { id: 'portfolio', i: <Icons.PieChart/>, l: 'Asset Portfolio' },
             { id: 'meetings', i: <Icons.Calendar/>, l: 'Sync Schedule' },
-            { id: 'chat', i: <Icons.MessageSquare/>, l: 'Secure Comms' },
-            { id: 'escrow', i: <Icons.CreditCard/>, l: 'Razorpay Ledger' }
+            { id: 'chat', i: <Icons.MessageSquare/>, l: 'Secure Comms' }
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} className={cx("w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 relative group", tab === t.id ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20" : "text-gray-400 hover:bg-white/5 hover:text-gray-200")}>
               {tab === t.id && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-[0_0_10px_white]"></div>}
@@ -402,12 +301,12 @@ export default function InvestorDashboard({ token }) {
             <div>
               <h2 className="text-4xl font-black text-white tracking-tight mb-3 flex items-center gap-4">
                 <span className="p-2.5 bg-indigo-900/30 text-indigo-400 rounded-xl border border-indigo-500/20">
-                  {tab === 'discovery' ? <Icons.Search width="28" height="28"/> : tab === 'portfolio' ? <Icons.PieChart width="28" height="28"/> : tab === 'meetings' ? <Icons.Calendar width="28" height="28"/> : tab === 'chat' ? <Icons.MessageSquare width="28" height="28"/> : <Icons.CreditCard width="28" height="28"/>}
+                  {tab === 'discovery' ? <Icons.Search width="28" height="28"/> : tab === 'meetings' ? <Icons.Calendar width="28" height="28"/> : <Icons.MessageSquare width="28" height="28"/>}
                 </span>
-                {tab === 'discovery' ? 'Discovery Matrix' : tab === 'portfolio' ? 'Asset Portfolio' : tab === 'meetings' ? 'Temporal Syncs' : tab === 'chat' ? 'Secure Pipeline' : 'Unified Ledger'}
+                {tab === 'discovery' ? 'Discovery Matrix' : tab === 'meetings' ? 'Temporal Syncs' : 'Secure Pipeline'}
               </h2>
               <p className="text-gray-400 text-sm max-w-3xl leading-relaxed font-medium">
-                {tab === 'discovery' ? 'Query verified startup nodes. Execute real-time due diligence and initiate atomic WebRTC syncs.' : tab === 'portfolio' ? 'Aggregated telemetry of deployed capital, IRR projections, and sector allocation.' : tab === 'meetings' ? 'Manage synchronized WebRTC operations and secure peer-to-peer data transfers.' : tab === 'chat' ? 'End-to-end AES-256 encrypted protocol for verified entity communication.' : 'Razorpay-backed escrow architecture. Monitor locking patterns and successful capital injections.'}
+                {tab === 'discovery' ? 'Query verified startup nodes. Execute real-time due diligence and initiate atomic WebRTC syncs.' : tab === 'meetings' ? 'Manage synchronized WebRTC operations and secure peer-to-peer data transfers.' : 'End-to-end AES-256 encrypted protocol for verified entity communication.'}
               </p>
             </div>
             {tab === 'discovery' && (
@@ -429,9 +328,6 @@ export default function InvestorDashboard({ token }) {
                   <button onClick={() => setView('list')} className={cx("p-2 rounded-lg transition-colors", view === 'list' ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300")}><Icons.List width="16" height="16"/></button>
                 </div>
               </div>
-            )}
-            {tab === 'escrow' && (
-              <Button onClick={() => setWizardStep(1)} v="primary" c="py-3 px-8 text-sm"><Icons.ArrowArrowDownLeft width="16" height="16"/> Inject Capital</Button>
             )}
           </header>
 
@@ -474,54 +370,6 @@ export default function InvestorDashboard({ token }) {
             </div>
           )}
 
-          {tab === 'portfolio' && (
-            <div className="space-y-8 animate-in fade-in duration-700">
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                <Card c="border-t-4 border-t-indigo-500 bg-gradient-to-b from-indigo-900/10 to-transparent">
-                  <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"><Icons.PieChart width="14" height="14"/> Total Deployed</h3>
-                  <p className="text-4xl font-black text-white font-mono">{fC(11000000)}</p>
-                  <div className="mt-4 flex items-center gap-2 text-emerald-400 text-xs font-bold bg-emerald-900/20 px-2 py-1 rounded w-max"><Icons.TrendingUp width="12" height="12"/> +12.5% MoM</div>
-                </Card>
-                <Card c="border-t-4 border-t-emerald-500 bg-gradient-to-b from-emerald-900/10 to-transparent">
-                  <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"><Icons.TrendingUp width="14" height="14"/> IRR Projection</h3>
-                  <p className="text-4xl font-black text-emerald-400 font-mono">24.5%</p>
-                  <div className="mt-4 flex items-center gap-2 text-gray-500 text-xs font-bold font-mono">Target: 30.0%</div>
-                </Card>
-                <Card c="border-t-4 border-t-purple-500 bg-gradient-to-b from-purple-900/10 to-transparent">
-                  <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"><Icons.Compass width="14" height="14"/> Active Nodes</h3>
-                  <p className="text-4xl font-black text-purple-400 font-mono">4 <span className="text-lg text-gray-500 font-sans">Entities</span></p>
-                  <div className="mt-4 flex items-center gap-2 text-gray-500 text-xs font-bold font-mono">Across 3 Sectors</div>
-                </Card>
-                <Card c="border-t-4 border-t-amber-500 bg-gradient-to-b from-amber-900/10 to-transparent">
-                  <h3 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-3 flex items-center gap-2"><Icons.Activity width="14" height="14"/> Pipeline Velocity</h3>
-                  <p className="text-4xl font-black text-amber-400 font-mono">1.2 <span className="text-lg text-gray-500 font-sans">Deals/Mo</span></p>
-                  <div className="mt-4 flex items-center gap-2 text-gray-500 text-xs font-bold font-mono">Top Quartile</div>
-                </Card>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <Card title="Sector Distribution" icon={Icons.PieChart} c="flex flex-col min-h-[450px]">
-                  <div className="flex-1 flex flex-col items-center justify-center py-6">
-                    <NativeDonut data={pData} size={260} sw={28} />
-                    <div className="mt-10 w-full grid grid-cols-2 gap-3 px-2">
-                      {pData.map((d, i) => (
-                        <div key={i} className="flex flex-col bg-black/30 p-3 rounded-xl border border-white/5">
-                          <div className="flex items-center gap-2 mb-1"><div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{backgroundColor: d.c}}></div><span className="text-xs text-gray-400 font-bold tracking-wide">{d.l}</span></div>
-                          <span className="text-sm text-white font-mono font-bold pl-4.5">{fC(d.v)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </Card>
-                <Card title="Performance Trajectory (30D)" icon={Icons.TrendingUp} c="lg:col-span-2 flex flex-col">
-                  <div className="flex-1 pt-6"><NativeLine data={tData} h={350} c="#4f46e5" fill={true} /></div>
-                </Card>
-                <Card title="Deal Volume Velocity" icon={Icons.Activity} c="lg:col-span-3 flex flex-col">
-                  <div className="flex-1 pt-6"><NativeBar data={bData} h={250} c="#10b981" /></div>
-                </Card>
-              </div>
-            </div>
-          )}
-
           {tab === 'meetings' && (
             <div className="animate-in fade-in duration-700 space-y-6">
               <Card title="Temporal Sync Roster" icon={Icons.Calendar} action={<Button v="secondary" c="!py-2 !px-4 text-xs"><Icons.DownloadCloud width="14" height="14"/> Export ICS</Button>}>
@@ -532,82 +380,51 @@ export default function InvestorDashboard({ token }) {
                     <p className="text-sm font-mono mt-2 text-gray-600">Query discovery matrix to schedule syncs.</p>
                   </div>
                 ) : (
-                  <DataGrid cols={[
-                    { k: 'e', l: 'Target Entity', render: r => <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-indigo-900/20 text-indigo-400 flex items-center justify-center font-black border border-indigo-500/20 shadow-inner">{r.startupId?.companyName?.charAt(0) || 'X'}</div><span className="font-bold text-white text-base">{r.startupId?.companyName || 'Unknown'}</span></div> },
-                    { k: 't', l: 'Coordinates', render: r => <div className="flex flex-col"><span className="text-indigo-400 font-bold mb-0.5">{fD(r.scheduledAt)}</span><span className="font-mono text-gray-400 text-xs">{fT(r.scheduledAt)} (UTC)</span></div> },
-                    { k: 'd', l: 'Duration', render: r => <span className="font-mono text-gray-300 bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-800">{r.duration} Min</span> },
-                    { k: 's', l: 'Status', render: r => <span className="text-[10px] font-mono uppercase tracking-widest px-3 py-1.5 rounded-lg border bg-emerald-900/20 text-emerald-400 border-emerald-500/20 shadow-inner"><Icons.CheckCircle width="10" height="10" className="inline mr-1 -mt-0.5"/>Confirmed</span> },
-                    { k: 'a', l: 'Link', align: 'right', render: r => <a href={`/meeting/${r.roomId}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-500/20 hover:scale-105"><Icons.Video width="14" height="14"/> Initialize</a> }
-                  ]} data={meetings} />
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-800 text-xs uppercase tracking-widest text-gray-500">
+                          <th className="py-4 font-semibold pl-4">Target Entity</th>
+                          <th className="py-4 font-semibold">Temporal Coordinates</th>
+                          <th className="py-4 font-semibold">Status</th>
+                          <th className="py-4 font-semibold text-right pr-4">Pipeline</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {meetings.map((m) => {
+                          const meetTime = new Date(m.scheduledAt);
+                          const canJoin = currentTime >= new Date(meetTime.getTime() - 5 * 60000).getTime();
+                          return (
+                            <tr key={m._id} className="border-b border-gray-800/50 hover:bg-gray-900/30 transition-colors">
+                              <td className="py-4 pl-4 font-bold text-white flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-900/30 text-indigo-400 flex items-center justify-center font-black border border-indigo-500/20">{m.startupId?.companyName?.charAt(0) || 'X'}</div>
+                                {m.startupId?.companyName || 'Unknown'}
+                              </td>
+                              <td className="py-4 text-sm text-gray-300 font-mono">
+                                <span className="text-indigo-400 mr-2">{fD(m.scheduledAt)}</span> 
+                                {fT(m.scheduledAt)}
+                              </td>
+                              <td className="py-4">
+                                <span className="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded border bg-emerald-900/20 text-emerald-400 border-emerald-500/20"><Icons.CheckCircle width="10" height="10" className="inline mr-1 -mt-0.5"/>Confirmed</span>
+                              </td>
+                              <td className="py-4 pr-4 text-right">
+                                {canJoin ? (
+                                  <a href={`/meeting/${m.roomId}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-500/20 hover:scale-105">
+                                    <Icons.Video width="14" height="14"/> Join Meet
+                                  </a>
+                                ) : (
+                                  <button disabled className="inline-flex items-center gap-2 bg-gray-800 text-gray-500 px-5 py-2.5 rounded-xl text-xs font-bold cursor-not-allowed border border-gray-700 transition-all">
+                                    <Icons.Clock width="14" height="14"/> Unlocks at {fT(m.scheduledAt)}
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
-              </Card>
-            </div>
-          )}
-
-          {tab === 'escrow' && (
-            <div className="space-y-8 animate-in fade-in duration-700 relative">
-              {wizardStep > 0 && (
-                <div className="absolute inset-0 z-50 bg-[#060913]/95 backdrop-blur-2xl rounded-3xl flex items-center justify-center p-8 animate-in zoom-in-95 duration-300 border border-indigo-500/30 shadow-[0_0_100px_rgba(79,70,229,0.15)]">
-                  <div className="w-full max-w-xl flex flex-col h-full max-h-[600px]">
-                    <div className="flex justify-between items-center mb-8">
-                      <div><h3 className="text-2xl font-black text-white">Injection Wizard</h3><p className="text-gray-400 text-sm font-mono mt-1 uppercase tracking-widest">Razorpay Settlement API</p></div>
-                      <button onClick={() => setWizardStep(0)} className="w-10 h-10 bg-gray-900 hover:bg-gray-800 rounded-full flex items-center justify-center text-gray-400 transition-colors"><Icons.X width="18" height="18"/></button>
-                    </div>
-                    {wizardStep === 1 && (
-                      <div className="flex-1 flex flex-col justify-center space-y-8 animate-in slide-in-from-right-8 duration-500">
-                        <div className="text-center"><Icons.ArrowDownLeft width="48" height="48" className="text-indigo-500 mx-auto mb-4 opacity-50"/><h4 className="text-xl font-bold text-white mb-2">Define Capital Quantum</h4><p className="text-gray-500 text-sm">Enter the exact INR denomination for escrow lock.</p></div>
-                        <div className="relative max-w-xs mx-auto w-full">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-gray-500">₹</span>
-                          <input type="number" value={depositAmt} onChange={e => setDepositAmt(e.target.value)} placeholder="5000000" className="w-full bg-black/50 border-2 border-indigo-500/30 rounded-2xl py-6 pl-12 pr-6 text-3xl font-black font-mono text-white focus:outline-none focus:border-indigo-500 focus:shadow-[0_0_30px_rgba(79,70,229,0.3)] transition-all text-center" />
-                        </div>
-                        <div className="flex justify-center gap-3">
-                          {[1000000, 5000000, 10000000].map(v => <button key={v} onClick={() => setDepositAmt(v)} className="px-4 py-2 rounded-xl border border-gray-800 bg-gray-900 text-gray-400 font-mono text-xs hover:bg-white/5 transition-colors">+{fC(v)}</button>)}
-                        </div>
-                        <div className="pt-8 text-center"><Button onClick={() => setWizardStep(2)} disabled={!depositAmt || depositAmt < 1000} c="w-full max-w-xs mx-auto py-4 text-lg">Initialize Protocol <Icons.ArrowRight width="18" height="18"/></Button></div>
-                      </div>
-                    )}
-                    {wizardStep === 2 && (
-                      <div className="flex-1 flex flex-col justify-center space-y-8 animate-in slide-in-from-right-8 duration-500">
-                        <div className="text-center"><div className="w-24 h-24 border-4 border-indigo-900/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-6"></div><h4 className="text-xl font-bold text-white mb-2">Awaiting Razorpay Handshake</h4><p className="text-gray-500 text-sm font-mono">Gateway implementation pending next sprint.</p></div>
-                        <div className="bg-gray-900/50 border border-gray-800 p-6 rounded-2xl max-w-sm mx-auto w-full">
-                          <div className="flex justify-between text-sm mb-3"><span className="text-gray-400">Quantum</span><span className="font-mono text-white font-bold">{fC(depositAmt)}</span></div>
-                          <div className="flex justify-between text-sm mb-3"><span className="text-gray-400">Protocol Fee (0.25%)</span><span className="font-mono text-gray-300">{fC(depositAmt*0.0025)}</span></div>
-                          <div className="w-full h-px bg-gray-800 my-4"></div>
-                          <div className="flex justify-between text-base"><span className="text-indigo-400 font-bold">Total Lock</span><span className="font-mono text-emerald-400 font-black">{fC(Number(depositAmt) + depositAmt*0.0025)}</span></div>
-                        </div>
-                        <div className="pt-4 text-center"><Button onClick={() => {setWizardStep(0); addToast('Simulated injection successful.', 'success'); setDepositAmt('');}} v="ghost">Abort Sequence</Button></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/40 via-[#0B0F19] to-[#0B0F19] border border-indigo-500/20 rounded-3xl p-8 shadow-2xl relative overflow-hidden lg:col-span-2">
-                  <Icons.CreditCard className="absolute -bottom-10 -right-10 w-64 h-64 text-indigo-500/5 rotate-12" />
-                  <h4 className="text-indigo-400 text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2 relative z-10"><Icons.Shield width="16" height="16"/> Available Dry Powder</h4>
-                  <p className="text-6xl font-black text-white mt-3 font-mono relative z-10">{fC(12000000)}</p>
-                  <div className="mt-8 flex gap-4 relative z-10">
-                    <Button onClick={() => setWizardStep(1)} v="primary" c="py-3.5 px-8"><Icons.ArrowDownLeft width="18" height="18"/> Inject Capital</Button>
-                    <Button v="secondary" c="py-3.5 px-8"><Icons.ArrowUpRight width="18" height="18"/> Withdraw</Button>
-                  </div>
-                </div>
-                <Card c="flex flex-col justify-center relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                  <h4 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2"><Icons.Activity width="16" height="16"/> Liquidity Metrics</h4>
-                  <div className="space-y-5">
-                    <div className="flex justify-between items-center"><p className="text-sm text-gray-400 font-medium">Locked in Active DD</p><p className="text-lg font-bold text-amber-400 font-mono">{fC(2500000)}</p></div>
-                    <div className="w-full h-px bg-white/5"></div>
-                    <div className="flex justify-between items-center"><p className="text-sm text-gray-400 font-medium">YTD Deployed</p><p className="text-lg font-bold text-emerald-400 font-mono">{fC(11000000)}</p></div>
-                    <div className="w-full h-px bg-white/5"></div>
-                    <div className="flex justify-between items-center"><p className="text-sm text-gray-400 font-medium">Protocol Fees</p><p className="text-lg font-bold text-gray-300 font-mono">{fC(32500)}</p></div>
-                  </div>
-                </Card>
-              </div>
-              <Card title="Ledger Immutable Record" icon={Icons.List} action={<Button v="ghost" c="!p-2"><Icons.Filter width="16" height="16"/></Button>} c="min-h-[500px] flex flex-col">
-                <div className="flex-1 -mx-6 -mb-6 mt-2">
-                  <DataGrid cols={cols} data={ledgerTxs} />
-                </div>
               </Card>
             </div>
           )}
@@ -772,7 +589,14 @@ export default function InvestorDashboard({ token }) {
                     </div>
                     <div className="pt-4 border-t border-white/5">
                       <h4 className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2"><Icons.Activity width="16" height="16"/> Algorithmic Scoring Matrix</h4>
-                      <NativeRadar data={rData} size={300} c="#4f46e5" />
+                      <div className="grid grid-cols-2 gap-4">
+                        {rData.map((d, i) => (
+                          <div key={i} className="bg-white/5 p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                            <span className="text-sm font-bold text-gray-300 tracking-wide">{d.l}</span>
+                            <span className="font-mono font-black text-indigo-400 bg-indigo-900/20 px-2 py-1 rounded border border-indigo-500/20">{d.v}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   <div className="p-8 border-t border-white/5 bg-black/40 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4">

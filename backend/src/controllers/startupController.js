@@ -1,7 +1,9 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import axios from 'axios';
 import Startup from '../models/Startup.js';
 import cloudinary from '../config/cloudinary.js';
+import { getIO } from '../socket.js';
 
 const allowedPitchDeckMimeTypes = [
   'application/pdf',
@@ -865,6 +867,87 @@ export const deleteStartup = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while deleting startup'
+    });
+  }
+};
+
+export const syncStartupMetrics = async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const startup = await Startup.findById(id);
+    if (!startup) {
+      return res.status(404).json({ success: false, message: 'Startup node not found.' });
+    }
+
+    const companyDomain = startup.domain || `${startup.companyName.toLowerCase().replace(/\s+/g, '')}.com`;
+
+    const cuFinderResponse = await axios.get('https://api.cufinder.io/v1/revenue', {
+      params: {
+        domain: companyDomain
+      },
+      headers: {
+        'apiKey': process.env.CUFINDER_API_KEY,
+        'Accept': 'application/json'
+      },
+      timeout: 5000
+    });
+
+    const apiData = cuFinderResponse.data;
+
+    if (!apiData || !apiData.revenue) {
+      return res.status(422).json({ 
+        success: false, 
+        message: 'Enrichment failed. Incomplete financial indicators returned from CUFinder upstream.' 
+      });
+    }
+
+    const freshRevenue = apiData.revenue; 
+    const calculatedValuation = apiData.valuation || (freshRevenue * 6); 
+
+    const updatedStartup = await Startup.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          'investmentDetails.annualRevenue': freshRevenue,
+          valuationAsk: calculatedValuation,
+          'investmentDetails.valuationAsk': calculatedValuation,
+          lastEnrichedAt: new Date()
+        }
+      },
+      { new: true, runValidators: true }
+    );
+
+    const io = getIO();
+    io.emit('matrix_update', {
+      type: 'METRIC_SYNC',
+      startupId: id,
+      valuationAsk: updatedStartup.valuationAsk,
+      financials: updatedStartup.investmentDetails
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Upstream financial synchronization complete.',
+      data: {
+        valuationAsk: updatedStartup.valuationAsk,
+        financials: updatedStartup.investmentDetails
+      }
+    });
+
+  } catch (error) {
+    console.error(`[SYNC ERROR] Critical failure during CUFinder ledger update for ID ${id}:`, error.message);
+    
+    if (error.response) {
+      return res.status(error.response.status).json({
+        success: false,
+        message: `Upstream Gateway Error: ${error.response.data?.message || 'CUFinder rejected request.'}`
+      });
+    }
+
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Internal processing cluster failure during real-time valuation query.' 
     });
   }
 };
