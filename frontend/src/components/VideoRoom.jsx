@@ -4,13 +4,6 @@ import { io } from 'socket.io-client';
 const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const socket = io(SERVER_URL, { transports: ['websocket'], autoConnect: false });
 
-const ICE_SERVERS = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
-  ]
-};
-
 const VideoPlayer = React.memo(({ stream, isLocal, isMuted, isHandRaised, label }) => {
   const videoRef = useRef(null);
 
@@ -56,6 +49,13 @@ const VideoRoom = ({ roomId }) => {
   const peersRef = useRef({});
   const localStreamRef = useRef(null);
   const initRef = useRef(false);
+  
+  const iceServersRef = useRef({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  });
 
   const cleanupPeer = useCallback((id) => {
     if (peersRef.current[id]) {
@@ -71,6 +71,25 @@ const VideoRoom = ({ roomId }) => {
 
     const initRoom = async () => {
       try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${SERVER_URL}/api/v1/meetings/turn-credentials`, {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.iceServers) {
+            iceServersRef.current = { iceServers: data.iceServers };
+          }
+        }
+      } catch (error) {
+        console.error("Twilio fetch failed:", error);
+      }
+
+      try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setLocalStream(stream);
         localStreamRef.current = stream;
@@ -85,7 +104,7 @@ const VideoRoom = ({ roomId }) => {
     initRoom();
 
     const createPeer = (targetId, stream) => {
-      const peer = new RTCPeerConnection(ICE_SERVERS);
+      const peer = new RTCPeerConnection(iceServersRef.current);
       
       stream.getTracks().forEach(track => peer.addTrack(track, stream));
 

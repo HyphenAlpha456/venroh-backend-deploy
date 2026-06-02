@@ -1,8 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import { google } from 'googleapis';
+import twilio from 'twilio';
 import Meeting from '../models/Meeting.js';
 import Startup from '../models/Startup.js';
-import User from '../models/User.js'; 
+import User from '../models/User.js';
 
 const auth = new google.auth.GoogleAuth({
   keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS || './google-credentials.json',
@@ -11,10 +12,10 @@ const auth = new google.auth.GoogleAuth({
 
 const calendar = google.calendar({ version: 'v3', auth });
 
-const createCalendarInvite = async (investorEmail, founderEmail, scheduledTime, meetingUrl) => {
+const createCalendarInvite = async (attendeeEmails, scheduledTime, meetingUrl) => {
   const event = {
     summary: 'VenRoh Secure Pitch Room',
-    description: `Your pitch session is scheduled. Join the live WebRTC video room here: ${meetingUrl}`,
+    description: `Your pitch session is scheduled. Join the live video room here: ${meetingUrl}`,
     start: {
       dateTime: new Date(scheduledTime).toISOString(),
       timeZone: 'Asia/Kolkata',
@@ -23,10 +24,7 @@ const createCalendarInvite = async (investorEmail, founderEmail, scheduledTime, 
       dateTime: new Date(new Date(scheduledTime).getTime() + 60 * 60 * 1000).toISOString(),
       timeZone: 'Asia/Kolkata',
     },
-    attendees: [
-      { email: investorEmail },
-      { email: founderEmail },
-    ],
+    attendees: attendeeEmails.map(email => ({ email })),
     reminders: {
       useDefault: false,
       overrides: [
@@ -39,12 +37,12 @@ const createCalendarInvite = async (investorEmail, founderEmail, scheduledTime, 
   await calendar.events.insert({
     calendarId: 'primary',
     resource: event,
-    sendUpdates: 'all', 
+    sendUpdates: 'all',
   });
 };
 
 export const updateAvailabilitySlots = async (req, res) => {
-  const { slots } = req.body; 
+  const { slots } = req.body;
 
   if (!Array.isArray(slots)) {
     return res.status(400).json({ success: false, message: 'Slots must be an array' });
@@ -74,15 +72,16 @@ export const updateAvailabilitySlots = async (req, res) => {
 };
 
 export const bookMeetingSlot = async (req, res) => {
-  const { startupId, slotId } = req.body;
+  const { startupId, slotId, additionalParticipantIds = [] } = req.body;
 
   try {
     const investorId = req.user._id;
+    const allParticipants = [investorId, ...additionalParticipantIds];
 
     const startup = await Startup.findOneAndUpdate(
       { _id: startupId, 'availabilitySlots._id': slotId },
       { $pull: { availabilitySlots: { _id: slotId } } },
-      { returnDocument: 'before' } 
+      { returnDocument: 'before' }
     );
 
     if (!startup) {
@@ -90,14 +89,14 @@ export const bookMeetingSlot = async (req, res) => {
     }
 
     const deletedSlot = startup.availabilitySlots.id(slotId);
-    
+
     const customRoomId = uuidv4();
     const frontendBaseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
     const meetingUrl = `${frontendBaseUrl}/meeting/${customRoomId}`;
 
     const meeting = await Meeting.create({
       hostId: startup.founderId,
-      investorId,
+      participants: allParticipants,
       startupId: startup._id,
       roomId: customRoomId,
       meetingUrl: meetingUrl,
@@ -107,14 +106,14 @@ export const bookMeetingSlot = async (req, res) => {
     });
 
     try {
-      const investor = await User.findById(investorId).lean();
-      const founder = await User.findById(startup.founderId).lean();
-      
-      if (investor?.email && founder?.email) {
-        await createCalendarInvite(investor.email, founder.email, meeting.scheduledAt, meetingUrl);
+      const users = await User.find({ _id: { $in: [meeting.hostId, ...allParticipants] } }).lean();
+      const emails = users.map(u => u.email).filter(Boolean);
+
+      if (emails.length > 0) {
+        await createCalendarInvite(emails, meeting.scheduledAt, meetingUrl);
       }
     } catch (calendarError) {
-      console.error(`[Calendar API Error]: ${calendarError.message} - Keys missing or invalid.`);
+      console.error(`[Calendar API Error]: ${calendarError.message}`);
     }
 
     return res.status(201).json({
@@ -130,7 +129,7 @@ export const bookMeetingSlot = async (req, res) => {
 
 export const requestMeeting = async (req, res) => {
   try {
-    const { startupId, scheduledAt } = req.body;
+    const { startupId, scheduledAt, additionalParticipantIds = [] } = req.body;
 
     if (!startupId || !scheduledAt) {
       return res.status(400).json({ success: false, message: 'Startup ID and Scheduled Time are required' });
@@ -142,7 +141,7 @@ export const requestMeeting = async (req, res) => {
     }
 
     const existingRequest = await Meeting.findOne({
-      investorId: req.user._id,
+      participants: req.user._id,
       startupId: startup._id,
       status: 'pending'
     }).lean();
@@ -153,10 +152,10 @@ export const requestMeeting = async (req, res) => {
 
     const meeting = await Meeting.create({
       hostId: startup.founderId,
-      investorId: req.user._id,
+      participants: [req.user._id, ...additionalParticipantIds],
       startupId: startup._id,
       scheduledAt,
-      status: 'pending' 
+      status: 'pending'
     });
 
     return res.status(201).json({ success: true, meeting });
@@ -169,29 +168,29 @@ export const requestMeeting = async (req, res) => {
 export const acceptMeeting = async (req, res) => {
   try {
     const meeting = await Meeting.findById(req.params.id);
-    
+
     if (!meeting) return res.status(404).json({ success: false, message: 'Meeting not found' });
     if (meeting.hostId.toString() !== req.user._id.toString()) return res.status(403).json({ success: false, message: 'Unauthorized' });
     if (meeting.status !== 'pending') return res.status(400).json({ success: false, message: `Meeting is ${meeting.status}` });
 
-    const customRoomId = uuidv4(); 
+    const customRoomId = uuidv4();
     const frontendBaseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-    
+
     meeting.status = 'scheduled';
     meeting.roomId = customRoomId;
-    meeting.meetingUrl = `${frontendBaseUrl}/meet/${customRoomId}`; 
+    meeting.meetingUrl = `${frontendBaseUrl}/meet/${customRoomId}`;
 
     await meeting.save();
 
     try {
-      const investor = await User.findById(meeting.investorId).lean();
-      const founder = await User.findById(meeting.hostId).lean();
-      
-      if (investor?.email && founder?.email) {
-        await createCalendarInvite(investor.email, founder.email, meeting.scheduledAt, meeting.meetingUrl);
+      const users = await User.find({ _id: { $in: [meeting.hostId, ...meeting.participants] } }).lean();
+      const emails = users.map(u => u.email).filter(Boolean);
+
+      if (emails.length > 0) {
+        await createCalendarInvite(emails, meeting.scheduledAt, meeting.meetingUrl);
       }
     } catch (calendarError) {
-      console.error(`[Calendar API Error]: ${calendarError.message} - Keys missing or invalid.`);
+      console.error(`[Calendar API Error]: ${calendarError.message}`);
     }
 
     return res.status(200).json({ success: true, meeting });
@@ -204,7 +203,7 @@ export const acceptMeeting = async (req, res) => {
 export const getPendingRequests = async (req, res) => {
   try {
     const pendingMeetings = await Meeting.find({ hostId: req.user._id, status: 'pending' })
-      .populate('investorId', 'name email')
+      .populate('participants', 'name email')
       .sort({ scheduledAt: 1 })
       .lean();
 
@@ -216,11 +215,14 @@ export const getPendingRequests = async (req, res) => {
 
 export const getUpcomingMeetings = async (req, res) => {
   try {
-    const filter = req.user.role === 'founder' ? { hostId: req.user._id } : { investorId: req.user._id };
-    filter.status = 'scheduled';
-
-    const upcomingMeetings = await Meeting.find(filter)
-      .populate('investorId', 'name email')
+    const upcomingMeetings = await Meeting.find({
+      status: 'scheduled',
+      $or: [
+        { hostId: req.user._id },
+        { participants: req.user._id }
+      ]
+    })
+      .populate('participants', 'name email')
       .populate('startupId', 'companyName cin')
       .sort({ scheduledAt: 1 })
       .lean();
@@ -251,8 +253,28 @@ export const endMeeting = async (req, res) => {
 
 export const getTurnCredentials = async (req, res) => {
   try {
-    return res.status(200).json({ success: true, message: 'Configure Twilio keys to activate TURN relay.' });
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+
+    if (!accountSid || !authToken) {
+      return res.status(500).json({
+        success: false,
+        message: 'Twilio credentials missing on server.'
+      });
+    }
+
+    const client = twilio(accountSid, authToken);
+    const token = await client.tokens.create();
+
+    return res.status(200).json({
+      success: true,
+      iceServers: token.iceServers
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to generate TURN credentials' });
+    console.error('Twilio Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate secure TURN credentials'
+    });
   }
 };
