@@ -4,6 +4,8 @@ import {
   createConversationFromStartup,
   getMyConversations,
   getConversationMessages,
+  sendMessage,
+  markConversationAsRead,
   createCloudinaryChatUploadSignature,
   saveCloudinaryFileMessage
 } from '../controllers/chatController.js';
@@ -34,6 +36,20 @@ router.get(
   protect,
   authorizeRoles('investor', 'founder'),
   getConversationMessages
+);
+
+router.post(
+  '/conversations/:conversationId/messages',
+  protect,
+  authorizeRoles('investor', 'founder'),
+  sendMessage
+);
+
+router.put(
+  '/conversations/:conversationId/read',
+  protect,
+  authorizeRoles('investor', 'founder'),
+  markConversationAsRead
 );
 
 router.post(

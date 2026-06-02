@@ -14,7 +14,6 @@ import walletRoutes from './src/routes/walletRoutes.js';
 import meetingRoutes from './src/routes/meetingRoutes.js';
 import chatRoutes from './src/routes/chatRoutes.js';
 
-// Import the unified socket initializer
 import { initSocket } from './src/socket/socket.js';
 
 dotenv.config();
@@ -23,7 +22,6 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 1. Initialize HTTP Server exactly ONCE
 const server = http.createServer(app);
 
 connectDB();
@@ -50,7 +48,6 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/startups', startupRoutes);
 app.use('/api/v1/wallet', walletRoutes);
@@ -64,7 +61,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// Global Error Handler
 app.use((err, req, res, next) => {
   console.error('Global Error:', err);
   const statusCode = err.statusCode || 500;
@@ -76,10 +72,9 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-// 2. Initialize Unified Socket.io (Chat + WebRTC are now handled here)
-initSocket(server);
+const io = initSocket(server);
+app.set('io', io);
 
-// 3. Boot the server
 server.listen(PORT, () => {
   console.log(`Server is ALIVE and routing traffic on port ${PORT}`);
 });

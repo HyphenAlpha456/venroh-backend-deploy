@@ -9,7 +9,7 @@ import {
   updateAvailabilitySlots,
   bookMeetingSlot
 } from '../controllers/meetingController.js';
-import { protect, authorizeRoles } from '../middlewares/authMiddleware.js';
+import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 

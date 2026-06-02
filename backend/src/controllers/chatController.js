@@ -140,9 +140,6 @@ const normalizeCloudinaryAttachment = ({ attachment, fallbackFileName, fallbackM
   };
 };
 
-// @desc    Investor starts or gets conversation with startup founder
-// @route   POST /api/v1/chat/startups/:startupId
-// @access  investor
 export const createConversationFromStartup = async (req, res) => {
   try {
     const { startupId } = req.params;
@@ -243,9 +240,6 @@ export const createConversationFromStartup = async (req, res) => {
   }
 };
 
-// @desc    Get logged-in user's conversations
-// @route   GET /api/v1/chat/conversations
-// @access  investor/founder
 export const getMyConversations = async (req, res) => {
   try {
     if (!['investor', 'founder'].includes(req.user.role)) {
@@ -284,12 +278,12 @@ export const getMyConversations = async (req, res) => {
   }
 };
 
-// @desc    Get messages for one conversation
-// @route   GET /api/v1/chat/conversations/:conversationId/messages
-// @access  investor/founder
 export const getConversationMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
 
     if (!mongoose.Types.ObjectId.isValid(conversationId)) {
       return res.status(400).json({
@@ -323,12 +317,14 @@ export const getConversationMessages = async (req, res) => {
 
     const messages = await Message.find({ conversationId })
       .populate('senderId', 'name email role')
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     return res.status(200).json({
       success: true,
       count: messages.length,
-      messages
+      messages: messages.reverse()
     });
   } catch (error) {
     console.error('Get Conversation Messages Error:', error);
@@ -340,9 +336,105 @@ export const getConversationMessages = async (req, res) => {
   }
 };
 
-// @desc    Generate Cloudinary signed upload params for chat file
-// @route   POST /api/v1/chat/conversations/:conversationId/cloudinary-signature
-// @access  investor/founder
+export const sendMessage = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { text } = req.body;
+
+    if (!text || text.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Message text is required'
+      });
+    }
+
+    const access = await checkConversationAccess({
+      conversationId,
+      user: req.user
+    });
+
+    if (!access.ok) {
+      return res.status(access.statusCode).json({
+        success: false,
+        message: access.message
+      });
+    }
+
+    let message = await Message.create({
+      conversationId,
+      senderId: req.user._id,
+      text: text.trim(),
+      readBy: [req.user._id]
+    });
+
+    await Conversation.findByIdAndUpdate(conversationId, {
+      lastMessage: message._id,
+      lastMessageText: text.trim(),
+      updatedAt: new Date()
+    });
+
+    message = await Message.findById(message._id).populate(
+      'senderId',
+      'name email role'
+    );
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(conversationId).emit('new_message', message);
+    }
+
+    return res.status(201).json({
+      success: true,
+      data: message
+    });
+  } catch (error) {
+    console.error('Send Message Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while sending message'
+    });
+  }
+};
+
+export const markConversationAsRead = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    const access = await checkConversationAccess({
+      conversationId,
+      user: req.user
+    });
+
+    if (!access.ok) {
+      return res.status(access.statusCode).json({
+        success: false,
+        message: access.message
+      });
+    }
+
+    await Message.updateMany(
+      {
+        conversationId,
+        readBy: { $ne: req.user._id }
+      },
+      {
+        $addToSet: { readBy: req.user._id }
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Messages marked as read'
+    });
+  } catch (error) {
+    console.error('Mark Conversation As Read Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while tracking read status'
+    });
+  }
+};
+
 export const createCloudinaryChatUploadSignature = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -430,9 +522,6 @@ export const createCloudinaryChatUploadSignature = async (req, res) => {
   }
 };
 
-// @desc    Save Cloudinary uploaded file as chat message
-// @route   POST /api/v1/chat/conversations/:conversationId/cloudinary-file-message
-// @access  investor/founder
 export const saveCloudinaryFileMessage = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -490,6 +579,11 @@ export const saveCloudinaryFileMessage = async (req, res) => {
       'senderId',
       'name email role'
     );
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(conversationId).emit('new_message', message);
+    }
 
     return res.status(201).json({
       success: true,

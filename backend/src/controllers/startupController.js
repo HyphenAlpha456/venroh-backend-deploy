@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import axios from 'axios';
 import Startup from '../models/Startup.js';
 import cloudinary from '../config/cloudinary.js';
-import { getIO } from '../socket.js';
+import { getIO } from '../socket/socket.js';
 
 const allowedPitchDeckMimeTypes = [
   'application/pdf',

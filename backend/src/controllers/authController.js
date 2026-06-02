@@ -43,11 +43,6 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    /**
-     * Important:
-     * Do NOT allow public users to register as admin.
-     * Admin should be created manually or through a protected seed script.
-     */
     const allowedRoles = ['founder', 'investor'];
 
     if (!allowedRoles.includes(role)) {
@@ -96,12 +91,13 @@ export const registerUser = async (req, res) => {
       user: userResponse
     });
   } catch (error) {
-    console.error('Register Error:', error);
+    console.error('Register Error:', error.keyValue || error);
 
     if (error.code === 11000) {
+      const duplicateField = Object.keys(error.keyValue)[0];
       return res.status(409).json({
         success: false,
-        message: 'User already exists with this email'
+        message: `${duplicateField} already exists. Please use a different one.`
       });
     }
 

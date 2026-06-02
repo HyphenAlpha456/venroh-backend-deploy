@@ -178,7 +178,7 @@ export const initSocket = (server) => {
           'name email role'
         );
 
-        io.to(conversationId).emit('receive_message', message);
+        io.to(conversationId).emit('new_message', message);
       } catch (error) {
         socket.emit('chat_error', { message: 'Failed to send message' });
       }
@@ -193,6 +193,7 @@ export const initSocket = (server) => {
     });
 
     socket.on('join-room', ({ roomId }) => {
+      socket.currentMeetingRoom = roomId;
       socket.join(roomId);
       socket.to(roomId).emit('user-connected', socket.id);
     });
@@ -214,7 +215,9 @@ export const initSocket = (server) => {
     });
 
     socket.on('disconnect', () => {
-      socket.broadcast.emit('user-disconnected', socket.id);
+      if (socket.currentMeetingRoom) {
+        socket.to(socket.currentMeetingRoom).emit('user-disconnected', socket.id);
+      }
     });
   });
 
