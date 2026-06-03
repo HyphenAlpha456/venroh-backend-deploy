@@ -11,7 +11,8 @@ import {
   getStartupPitch,
   verifyStartup,
   unverifyStartup,
-  deleteStartup
+  deleteStartup,
+  syncStartupMetrics
 } from '../controllers/startupController.js';
 
 import {
@@ -56,5 +57,7 @@ router.patch('/:id/verify', protect, authorizeRoles('admin'), verifyStartup);
 router.patch('/:id/unverify', protect, authorizeRoles('admin'), unverifyStartup);
 
 router.delete('/:id', protect, authorizeRoles('admin'), deleteStartup);
+
+router.post('/:id/sync-metrics', protect, authorizeRoles('admin'), syncStartupMetrics);
 
 export default router;
