@@ -4,6 +4,7 @@ import axios from 'axios';
 import Startup from '../models/Startup.js';
 import cloudinary from '../config/cloudinary.js';
 import { getIO } from '../socket/socket.js';
+import { verifyRealMCA } from '../services/mcaService.js';
 
 const allowedPitchDeckMimeTypes = [
   'application/pdf',
@@ -97,25 +98,12 @@ const calculatePitchCompleted = (startup) => {
   );
 };
 
-const verifyMCAStatus = async (cin) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (!cin || cin.length !== 21) {
-        return resolve({ verified: false, message: 'Invalid CIN format' });
-      }
-      resolve({ 
-        verified: true, 
-        legalName: 'Auto-Fetched Company Name Pvt Ltd'
-      });
-    }, 600);
-  });
-};
-
 export const createStartup = async (req, res) => {
   try {
     const {
       companyName,
       cin,
+      domain,
       authorizedCapital,
       paidUpCapital,
       valuationAsk,
@@ -170,18 +158,21 @@ export const createStartup = async (req, res) => {
       });
     }
 
-    const mcaResponse = await verifyMCAStatus(normalizedCin);
+    const mcaResponse = await verifyRealMCA(normalizedCin);
     
     if (!mcaResponse.verified) {
       return res.status(400).json({ 
         success: false, 
-        message: 'MCA Verification failed. Please check your CIN.' 
+        message: mcaResponse.message 
       });
     }
 
     const startup = await Startup.create({
       founderId: req.user._id,
       companyName: companyName.trim(),
+      legalCompanyName: mcaResponse.legalName,
+      kycReferenceId: mcaResponse.referenceId,
+      domain: domain ? domain.toLowerCase().trim() : '',
       cin: normalizedCin,
       mcaStatus: 'Verified',
       authorizedCapital: authorizedCapital || 0,
@@ -358,6 +349,7 @@ export const updateMyStartup = async (req, res) => {
 
     const allowedUpdates = [
       'companyName',
+      'domain',
       'authorizedCapital',
       'paidUpCapital',
       'valuationAsk',
