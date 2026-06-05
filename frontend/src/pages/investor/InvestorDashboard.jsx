@@ -12,36 +12,8 @@ let socket;
 export default function InvestorDashboard() {
   const [activeView, setActiveView] = useState('discovery');
   
-  const [startups, setStartups] = useState([{
-    _id: "dummy123",
-    companyName: "VenRoh Test Startup",
-    cin: "U72900KA2015PTC082988",
-    pitch: { oneLinePitch: "This is a fake startup so I can test my UI and see my buttons!" },
-    investmentDetails: { amountRequired: 5000000, fundingStage: "Seed" },
-    valuationAsk: 20000000,
-    pitchDeckUrl: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=1000&auto=format&fit=crop",
-    availabilitySlots: []
-  }]);
-  
-  const [dummyChats] = useState([
-    {
-      _id: "chat1",
-      startupName: "Test Startup Pvt Ltd",
-      founderName: "bob",
-      lastUpdated: "4 Jun 2026, 2:45 am",
-      hasAttachment: true,
-      isLive: true
-    },
-    {
-      _id: "chat2",
-      startupName: "Nexa Private Limited",
-      founderName: "founder2",
-      lastUpdated: "23 May 2026, 9:10 pm",
-      hasAttachment: false,
-      isLive: false
-    }
-  ]);
-
+  const [startups, setStartups] = useState([]);
+  const [conversations, setConversations] = useState([]);
   const [selectedStartup, setSelectedStartup] = useState(null);
   const [loading, setLoading] = useState(false);
   const [upcomingMeetings, setUpcomingMeetings] = useState([]);
@@ -69,12 +41,50 @@ export default function InvestorDashboard() {
     });
 
     socket.on('new_message', (msg) => {
-      setMessages(prev => [...prev, msg]);
+      setMessages(prev => {
+        const exists = prev.some(m => m._id === msg._id);
+        if (exists) return prev;
+        return [...prev, msg];
+      });
       scrollToBottom();
+    });
+
+    socket.on('matrix_update', (data) => {
+      if (data.type === 'METRIC_SYNC') {
+        setStartups(prevStartups => 
+          prevStartups.map(startup => 
+            startup._id === data.startupId 
+              ? { 
+                  ...startup, 
+                  valuationAsk: data.valuationAsk,
+                  investmentDetails: {
+                    ...startup.investmentDetails,
+                    ...data.financials
+                  }
+                } 
+              : startup
+          )
+        );
+
+        setSelectedStartup(prevSelected => {
+          if (prevSelected && prevSelected._id === data.startupId) {
+            return {
+              ...prevSelected,
+              valuationAsk: data.valuationAsk,
+              investmentDetails: {
+                ...prevSelected.investmentDetails,
+                ...data.financials
+              }
+            };
+          }
+          return prevSelected;
+        });
+      }
     });
 
     fetchStartups();
     fetchMeetings();
+    fetchConversations();
 
     return () => socket.disconnect();
   }, [token]);
@@ -87,13 +97,14 @@ export default function InvestorDashboard() {
 
   const fetchStartups = async () => {
     try {
+      setLoading(true);
       const res = await fetch(`${SERVER_URL}/api/startups`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
       if (data.success) setStartups(data.startups);
     } catch (err) {
-      console.error('Failed to fetch startups', err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -107,36 +118,78 @@ export default function InvestorDashboard() {
       const data = await res.json();
       if (data.success) setUpcomingMeetings(data.meetings);
     } catch (err) {
-      console.error('Failed to fetch meetings', err);
+      console.error(err);
+    }
+  };
+
+  const fetchConversations = async () => {
+    try {
+      const res = await fetch(`${SERVER_URL}/api/v1/chat/conversations`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) setConversations(data.conversations);
+    } catch (err) {
+      console.error(err);
     }
   };
 
   const handleSummarizePitch = async () => {
+    if (!selectedStartup || !selectedStartup.pitchDeckUrl) {
+      alert("This startup has not uploaded a pitch deck yet.");
+      return;
+    }
+
     setIsSummarizing(true);
+    setSummary('');
+    
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const mockSummary = "This startup is revolutionizing their domain by addressing key market inefficiencies. They require funding to scale their proven MVP and capture a $10B TAM. Projected ROI is significant given their lean business model and unique competitive moat.";
-      setSummary(mockSummary);
+      const res = await fetch(`${SERVER_URL}/api/startups/${selectedStartup._id}/summarize`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setSummary(data.summary);
+      } else {
+        alert(data.message || "Failed to generate summary.");
+      }
     } catch (err) {
       console.error(err);
+      alert('Network error while summarizing pitch deck.');
     } finally {
       setIsSummarizing(false);
     }
   };
 
-  const openChatWithFounder = async (startupId, startupName = "VenRoh Test Startup") => {
-    setActiveConversation({ 
-      _id: "dummy_chat_123", 
-      startupId: { companyName: startupName } 
-    });
-    setMessages([
-      { 
-        text: "Hi! Thanks for viewing our pitch. Let me know if you have questions.", 
-        senderId: { role: 'founder' },
-        createdAt: new Date().toISOString()
+  const openChatWithFounder = async (startupId) => {
+    try {
+      const res = await fetch(`${SERVER_URL}/api/v1/chat/startups/${startupId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setActiveConversation(data.conversation);
+        socket?.emit('join_conversation', { conversationId: data.conversation._id });
+        
+        const msgRes = await fetch(`${SERVER_URL}/api/v1/chat/conversations/${data.conversation._id}/messages`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const msgData = await msgRes.json();
+        
+        if (msgData.success) {
+          setMessages(msgData.messages);
+          scrollToBottom();
+        }
+        setChatOpen(true);
+      } else {
+        alert(data.message);
       }
-    ]);
-    setChatOpen(true);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const sendMessage = () => {
@@ -163,11 +216,15 @@ export default function InvestorDashboard() {
       if (data.success) {
         alert('Meeting Booked Successfully! Check your calendar.');
         fetchMeetings(); 
+        setSelectedStartup(prev => ({
+          ...prev,
+          availabilitySlots: prev.availabilitySlots.filter(s => s._id !== slotId)
+        }));
       } else {
         alert(data.message);
       }
     } catch (err) {
-      console.error('Booking failed', err);
+      console.error(err);
     }
   };
 
@@ -188,15 +245,16 @@ export default function InvestorDashboard() {
         alert('Meeting request sent to founder!');
         setCustomTimeModalOpen(false);
         setCustomDateTime('');
+      } else {
+        alert(data.message);
       }
     } catch (err) {
-      console.error('Request failed', err);
+      console.error(err);
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans flex">
-      
       <aside className="w-64 bg-white border-r border-gray-200 p-6 flex flex-col hidden md:flex">
         <h1 className="text-2xl font-bold text-[#0B0F19] mb-8">
           VenRoh Hub
@@ -244,13 +302,13 @@ export default function InvestorDashboard() {
           
           <div className="flex bg-white/10 p-1 rounded-xl">
             <button 
-              onClick={() => setActiveView('discovery')}
+              onClick={() => { setActiveView('discovery'); fetchStartups(); }}
               className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition ${activeView === 'discovery' ? 'bg-white text-[#0B0F19] shadow-md' : 'text-gray-300 hover:text-white'}`}
             >
               Discovery Board
             </button>
             <button 
-              onClick={() => setActiveView('chats')}
+              onClick={() => { setActiveView('chats'); fetchConversations(); }}
               className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition ${activeView === 'chats' ? 'bg-white text-[#0B0F19] shadow-md' : 'text-gray-300 hover:text-white'}`}
             >
               My Chats
@@ -263,7 +321,7 @@ export default function InvestorDashboard() {
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Conversation Inbox</h3>
-                <p className="text-sm text-gray-500">{dummyChats.length} conversations</p>
+                <p className="text-sm text-gray-500">{conversations.length} conversations</p>
               </div>
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -276,41 +334,49 @@ export default function InvestorDashboard() {
             </div>
             
             <div className="divide-y divide-gray-100">
-              {dummyChats.map(chat => (
-                <div 
-                  key={chat._id} 
-                  onClick={() => openChatWithFounder(chat._id, chat.startupName)}
-                  className="p-6 hover:bg-gray-50 cursor-pointer transition flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[#0B0F19] rounded-xl flex items-center justify-center shadow-md">
-                      <Building2 size={20} className="text-white" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-base font-bold text-gray-900 group-hover:text-blue-600 transition">{chat.startupName}</h4>
-                        {chat.isLive && (
-                          <span className="bg-emerald-50 text-emerald-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-                            Live
-                          </span>
-                        )}
+              {conversations.length === 0 ? (
+                <div className="p-8 text-center text-gray-500 text-sm">No active conversations yet.</div>
+              ) : (
+                conversations.map(chat => {
+                  const founder = chat.participants.find(p => p.role === 'founder');
+                  
+                  return (
+                    <div 
+                      key={chat._id} 
+                      onClick={() => openChatWithFounder(chat.startupId?._id)}
+                      className="p-6 hover:bg-gray-50 cursor-pointer transition flex items-center justify-between group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-[#0B0F19] rounded-xl flex items-center justify-center shadow-md">
+                          <Building2 size={20} className="text-white" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-base font-bold text-gray-900 group-hover:text-blue-600 transition">
+                              {chat.startupId?.companyName || 'Unknown Startup'}
+                            </h4>
+                            {chat.startupId?.isLive && (
+                              <span className="bg-emerald-50 text-emerald-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                                Live
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500 mt-0.5">With: <span className="font-medium text-gray-700">{founder?.name || 'Founder'}</span></p>
+                          <p className="text-xs text-gray-400 mt-1.5 truncate max-w-sm">
+                            {chat.lastMessageText || 'No messages yet. Open conversation to start.'}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-500 mt-0.5">With: <span className="font-medium text-gray-700">{chat.founderName}</span></p>
-                      {chat.hasAttachment ? (
-                        <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
-                          <Paperclip size={12} /> Attachment
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Last Updated</p>
+                        <p className="text-xs text-gray-600 font-medium mt-1">
+                          {new Date(chat.updatedAt).toLocaleDateString()}
                         </p>
-                      ) : (
-                        <p className="text-xs text-gray-400 mt-1.5">No messages yet. Open conversation to start.</p>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Last Updated</p>
-                    <p className="text-xs text-gray-600 font-medium mt-1">{chat.lastUpdated}</p>
-                  </div>
-                </div>
-              ))}
+                  );
+                })
+              )}
             </div>
           </div>
         )}
@@ -333,9 +399,11 @@ export default function InvestorDashboard() {
                       <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition">{startup.companyName}</h3>
                       <p className="text-sm text-gray-500 font-medium uppercase tracking-wider mt-1">{startup.investmentDetails?.fundingStage || 'Early Stage'}</p>
                     </div>
-                    <span className="bg-emerald-50 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">
-                      MCA Verified
-                    </span>
+                    {startup.mcaStatus === 'Verified' && (
+                      <span className="bg-emerald-50 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">
+                        MCA Verified
+                      </span>
+                    )}
                   </div>
                   
                   <p className="text-gray-600 text-sm line-clamp-3 mb-6 leading-relaxed">
@@ -373,7 +441,7 @@ export default function InvestorDashboard() {
               </div>
               <div className="flex gap-3">
                 <button 
-                  onClick={() => openChatWithFounder(selectedStartup._id, selectedStartup.companyName)}
+                  onClick={() => openChatWithFounder(selectedStartup._id)}
                   className="bg-[#0B0F19] hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-bold transition shadow-md"
                 >
                   <MessageSquare size={16} /> Chat Founder
@@ -529,7 +597,7 @@ export default function InvestorDashboard() {
 
           <div className="flex-1 h-96 overflow-y-auto p-5 space-y-4 bg-gray-50">
             {messages.map((msg, idx) => {
-              const isMine = msg.senderId?.role === 'investor'; 
+              const isMine = msg.senderId?._id === JSON.parse(atob(token.split('.')[1])).id; 
               
               return (
                 <div key={idx} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>

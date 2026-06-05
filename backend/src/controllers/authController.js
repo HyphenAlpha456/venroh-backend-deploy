@@ -43,9 +43,20 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    const allowedRoles = ['founder', 'investor'];
+    const normalizedEmail = email.toLowerCase().trim();
 
-    if (!allowedRoles.includes(role)) {
+    let assignedRole = role;
+    if (normalizedEmail === process.env.OFFICIAL_ADMIN_EMAIL?.toLowerCase().trim()) {
+      assignedRole = 'admin';
+    } else if (role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid role. Allowed roles: founder, investor'
+      });
+    }
+
+    const allowedRoles = ['founder', 'investor', 'admin'];
+    if (!allowedRoles.includes(assignedRole)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role. Allowed roles: founder, investor'
@@ -58,8 +69,6 @@ export const registerUser = async (req, res) => {
         message: 'Password must be at least 6 characters'
       });
     }
-
-    const normalizedEmail = email.toLowerCase().trim();
 
     const existingUser = await User.findOne({ email: normalizedEmail });
 
@@ -77,7 +86,7 @@ export const registerUser = async (req, res) => {
       name: name.trim(),
       email: normalizedEmail,
       password: hashedPassword,
-      role
+      role: assignedRole
     });
 
     const token = generateToken(user._id);

@@ -93,6 +93,10 @@ const investmentDetailsSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: ''
+    },
+    annualRevenue: {
+      type: Number,
+      default: 0
     }
   },
   { _id: false }
@@ -238,6 +242,10 @@ const startupSchema = new mongoose.Schema(
     isLive: {
       type: Boolean,
       default: false
+    },
+    lastEnrichedAt: {
+      type: Date,
+      default: null
     }
   },
   {
