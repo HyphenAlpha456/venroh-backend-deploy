@@ -11,8 +11,8 @@ const transactionSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now }
 }, { versionKey: false });
 
-transactionSchema.index({ walletId: 1, timestamp: -1 });
-transactionSchema.index({ razorpayOrderId: 1 }, { sparse: true });
-transactionSchema.index({ status: 1 });
+// transactionSchema.index({ walletId: 1, timestamp: -1 });
+// transactionSchema.index({ razorpayOrderId: 1 }, { sparse: true });
+// transactionSchema.index({ status: 1 });
 
 export default mongoose.model('Transaction', transactionSchema);

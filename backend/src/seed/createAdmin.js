@@ -1,9 +1,9 @@
-import dotenv from 'dotenv';
+import dns from "dns";
+import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import User from '../models/User.js';
 
-dotenv.config();
 
 const createAdmin = async () => {
   try {
@@ -35,5 +35,7 @@ const createAdmin = async () => {
     process.exit(1);
   }
 };
+
+ dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 createAdmin();

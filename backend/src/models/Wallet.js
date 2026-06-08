@@ -8,6 +8,6 @@ const walletSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 }, { versionKey: false });
 
-walletSchema.index({ userId: 1 });
+// walletSchema.index({ userId: 1 });
 
 export default mongoose.model('Wallet', walletSchema);

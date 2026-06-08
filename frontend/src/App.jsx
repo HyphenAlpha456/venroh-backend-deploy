@@ -19,6 +19,7 @@ import ChatPage from './pages/chat/ChatPage';
 import MeetingsPage from './pages/meetings/MeetingsPage';
 import MeetingRoomPage from './pages/meetings/MeetingRoomPage';
 import ChatInboxPage from './pages/chat/ChatInboxPage';
+import WalletPage from './pages/investor/WalletPage';
 
 function App() {
   return (
@@ -144,7 +145,14 @@ function App() {
           </ProtectedRoute>
         }
       />
-
+      <Route
+        path="/wallet"
+        element={
+          <ProtectedRoute allowedRoles={['investor', 'founder']}>
+            <WalletPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
