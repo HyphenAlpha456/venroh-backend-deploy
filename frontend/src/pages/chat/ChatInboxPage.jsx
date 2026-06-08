@@ -128,8 +128,8 @@ const ChatInboxPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="flex h-screen flex-col bg-slate-50">
+      <header className="flex-none border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <button
             onClick={goBackByRole}
@@ -151,8 +151,8 @@ const ChatInboxPage = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <section className="mb-8 rounded-3xl bg-slate-950 p-8 text-white">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col overflow-hidden px-6 py-8">
+        <section className="flex-none mb-8 rounded-3xl bg-slate-950 p-8 text-white">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-950">
             <MessageCircle size={28} />
           </div>
@@ -166,16 +166,15 @@ const ChatInboxPage = () => {
           </p>
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 p-6">
+        <section className="flex min-h-0 flex-1 flex-col rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="flex-none border-b border-slate-200 p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-950">
                   Conversation Inbox
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  {filteredConversations.length} conversation
-                  {filteredConversations.length !== 1 ? 's' : ''}
+                  {filteredConversations.length} conversation{filteredConversations.length !== 1 ? 's' : ''}
                 </p>
               </div>
 
@@ -196,30 +195,30 @@ const ChatInboxPage = () => {
           </div>
 
           {error && (
-            <div className="m-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div className="flex-none m-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {error}
             </div>
           )}
 
-          {loading ? (
-            <div className="p-8 text-center text-sm font-medium text-slate-500">
-              Loading conversations...
-            </div>
-          ) : filteredConversations.length === 0 ? (
-            <div className="p-10 text-center">
-              <MessageCircle className="mx-auto mb-4 text-slate-400" size={36} />
+          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-200">
+            {loading ? (
+              <div className="p-8 text-center text-sm font-medium text-slate-500">
+                Loading conversations...
+              </div>
+            ) : filteredConversations.length === 0 ? (
+              <div className="p-10 text-center">
+                <MessageCircle className="mx-auto mb-4 text-slate-400" size={36} />
 
-              <h3 className="text-lg font-bold text-slate-950">
-                No conversations found
-              </h3>
+                <h3 className="text-lg font-bold text-slate-950">
+                  No conversations found
+                </h3>
 
-              <p className="mt-2 text-sm text-slate-500">
-                Investor conversations will appear here after contact is started.
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-200">
-              {filteredConversations.map((conversation) => {
+                <p className="mt-2 text-sm text-slate-500">
+                  Investor conversations will appear here after contact is started.
+                </p>
+              </div>
+            ) : (
+              filteredConversations.map((conversation) => {
                 const otherParticipant = getOtherParticipant(conversation);
                 const startup = conversation.startupId;
 
@@ -276,9 +275,9 @@ const ChatInboxPage = () => {
                     </div>
                   </Link>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
         </section>
       </main>
     </div>

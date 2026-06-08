@@ -8,6 +8,7 @@ import {
   Trash2,
   XCircle
 } from 'lucide-react';
+import axios from 'axios';
 
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -106,6 +107,21 @@ const AdminDashboard = () => {
       await fetchStartups();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete startup');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const handleViewPitch = async (startupId) => {
+    try {
+      setActionLoading(`deck-${startupId}`);
+      setError('');
+      const response = await axios.get(`/api/startups/${startupId}/pitch-url`, {
+        withCredentials: true
+      });
+      window.open(response.data.url, '_blank');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load secure pitch deck');
     } finally {
       setActionLoading('');
     }
@@ -273,15 +289,14 @@ const AdminDashboard = () => {
 
                   <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                     {startup.pitchDeckUrl && (
-                      <a
-                        href={startup.pitchDeckUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      <button
+                        onClick={() => handleViewPitch(startup._id)}
+                        disabled={actionLoading === `deck-${startup._id}`}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                       >
                         <Eye size={16} />
-                        Deck
-                      </a>
+                        {actionLoading === `deck-${startup._id}` ? 'Loading...' : 'Deck'}
+                      </button>
                     )}
 
                     {!startup.isLive ? (

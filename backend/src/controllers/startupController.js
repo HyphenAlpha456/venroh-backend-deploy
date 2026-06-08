@@ -1,10 +1,15 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import axios from 'axios';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdf = require('pdf-parse');
+import Tesseract from 'tesseract.js';
 import Startup from '../models/Startup.js';
 import cloudinary from '../config/cloudinary.js';
 import { getIO } from '../socket/socket.js';
 import { verifyRealMCA } from '../services/mcaService.js';
+import summarizer from '../services/neuralPitchSummarizer.js';
 
 const allowedPitchDeckMimeTypes = [
   'application/pdf',
@@ -192,8 +197,6 @@ export const createStartup = async (req, res) => {
       startup
     });
   } catch (error) {
-    console.error('Create Startup Error:', error);
-
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
@@ -233,8 +236,6 @@ export const getMyStartup = async (req, res) => {
       startup
     });
   } catch (error) {
-    console.error('Get My Startup Error:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching startup'
@@ -264,8 +265,6 @@ export const getStartups = async (req, res) => {
       startups
     });
   } catch (error) {
-    console.error('Get Startups Error:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching startups'
@@ -318,8 +317,6 @@ export const getStartupById = async (req, res) => {
       startup
     });
   } catch (error) {
-    console.error('Get Startup By ID Error:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching startup'
@@ -390,8 +387,6 @@ export const updateMyStartup = async (req, res) => {
       startup: updatedStartup
     });
   } catch (error) {
-    console.error('Update Startup Error:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Server error while updating startup'
@@ -476,7 +471,9 @@ export const createPitchDeckSignature = async (req, res) => {
 
     const paramsToSign = {
       public_id: publicId,
-      timestamp
+      timestamp,
+      type: 'upload',
+      access_mode: 'public'
     };
 
     const signature = cloudinary.utils.api_sign_request(
@@ -498,8 +495,6 @@ export const createPitchDeckSignature = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Create Pitch Deck Signature Error:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Server error while creating pitch deck upload signature'
@@ -631,8 +626,6 @@ export const updateStartupPitch = async (req, res) => {
       startup: updatedStartup
     });
   } catch (error) {
-    console.error('Update Startup Pitch Error:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Server error while updating startup pitch'
@@ -701,8 +694,6 @@ export const getStartupPitch = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get Startup Pitch Error:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Server error while fetching startup pitch'
@@ -764,8 +755,6 @@ export const verifyStartup = async (req, res) => {
       startup: updatedStartup
     });
   } catch (error) {
-    console.error('Verify Startup Error:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Server error while verifying startup'
@@ -811,8 +800,6 @@ export const unverifyStartup = async (req, res) => {
       startup: updatedStartup
     });
   } catch (error) {
-    console.error('Unverify Startup Error:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Server error while unverifying startup'
@@ -854,8 +841,6 @@ export const deleteStartup = async (req, res) => {
       message: 'Startup deleted successfully'
     });
   } catch (error) {
-    console.error('Delete Startup Error:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Server error while deleting startup'
@@ -928,8 +913,6 @@ export const syncStartupMetrics = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(`[SYNC ERROR] Critical failure during CUFinder ledger update for ID ${id}:`, error.message);
-    
     if (error.response) {
       return res.status(error.response.status).json({
         success: false,
@@ -941,5 +924,106 @@ export const syncStartupMetrics = async (req, res) => {
       success: false, 
       message: 'Internal processing cluster failure during real-time valuation query.' 
     });
+  }
+};
+
+export const getPitchDeckUrl = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid startup ID'
+      });
+    }
+
+    const startup = await Startup.findById(id);
+
+    if (!startup || !startup.pitchDeck || !startup.pitchDeck.publicId) {
+      return res.status(404).json({
+        success: false,
+        message: 'Startup or pitch deck not found'
+      });
+    }
+
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+
+    const signedUrl = cloudinary.url(startup.pitchDeck.publicId, {
+      resource_type: 'raw',
+      type: 'authenticated',
+      sign_url: true,
+      secure: true
+    });
+
+    return res.status(200).json({
+      success: true,
+      url: signedUrl
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to generate secure link'
+    });
+  }
+};
+
+export const summarizePitch = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid ID' });
+    }
+
+    const startup = await Startup.findById(id);
+    if (!startup || !startup.pitchDeck?.publicId) {
+      return res.status(404).json({ success: false, message: 'Startup or Pitch Deck not found' });
+    }
+
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+
+    let summary = "";
+
+    try {
+      const signedUrl = cloudinary.utils.private_download_url(
+        startup.pitchDeck.publicId,
+        'pdf',
+        {
+          resource_type: startup.pitchDeck.resourceType || 'raw',
+          type: 'upload'
+        }
+      );
+
+      const response = await axios.get(signedUrl, { responseType: 'arraybuffer' });
+      const base64Data = Buffer.from(response.data).toString('base64');
+      const mimeType = response.headers['content-type'];
+
+      summary = await summarizer.summarizeFile(base64Data, mimeType, 3);
+    } catch (err) {
+      console.error("--- FETCH FAILED ---", err.message);
+    }
+
+    if (!summary) {
+      const fallbackText = [startup.pitch?.oneLinePitch, startup.pitch?.problem, startup.pitch?.solution].filter(Boolean).join('. ');
+      if (fallbackText && fallbackText.trim().length > 10) {
+        summary = await summarizer.summarizeFile(Buffer.from(fallbackText).toString('base64'), 'text/plain', 3);
+      }
+    }
+
+    if (!summary) {
+      return res.status(400).json({ success: false, message: "Could not retrieve document." });
+    }
+
+    return res.status(200).json({ success: true, summary });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

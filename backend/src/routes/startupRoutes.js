@@ -12,7 +12,9 @@ import {
   verifyStartup,
   unverifyStartup,
   deleteStartup,
-  syncStartupMetrics
+  syncStartupMetrics,
+  getPitchDeckUrl,
+  summarizePitch
 } from '../controllers/startupController.js';
 
 import {
@@ -48,6 +50,18 @@ router.get(
   '/:id/pitch',
   protect,
   getStartupPitch
+);
+
+router.get(
+  '/:id/pitch-url',
+  protect,
+  getPitchDeckUrl
+);
+
+router.get(
+  '/:id/summarize',
+  protect,
+  summarizePitch
 );
 
 router.get('/:id', protect, getStartupById);

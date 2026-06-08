@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
+import axios from 'axios';
 import { 
   Briefcase, Calendar, MessageSquare, FileText, X, Send, 
-  Paperclip, CreditCard, Video, BrainCircuit, ChevronRight, Clock, Search, Building2 
+  Paperclip, CreditCard, Video, BrainCircuit, ChevronRight, Clock, Search, Building2, Eye 
 } from 'lucide-react';
 
 const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -253,6 +254,18 @@ export default function InvestorDashboard() {
     }
   };
 
+  const handleViewPitch = async (startupId) => {
+    try {
+      const response = await axios.get(`${SERVER_URL}/api/startups/${startupId}/pitch-url`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      window.open(response.data.url, '_blank');
+    } catch (err) {
+      console.error('Failed to load secure pitch deck', err);
+      alert('Failed to load secure pitch deck');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans flex">
       <aside className="w-64 bg-white border-r border-gray-200 p-6 flex flex-col hidden md:flex">
@@ -478,13 +491,18 @@ export default function InvestorDashboard() {
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <FileText className="text-gray-400" /> Executive Pitch Deck
                 </h3>
-                <div className="bg-gray-100 rounded-2xl border border-gray-200 h-[500px] overflow-hidden flex justify-center items-center relative shadow-inner">
+                <div className="bg-gray-100 rounded-2xl border border-gray-200 py-16 px-6 overflow-hidden flex flex-col justify-center items-center relative shadow-inner text-center">
                   {selectedStartup.pitchDeckUrl ? (
-                    <iframe 
-                      src={selectedStartup.pitchDeckUrl} 
-                      className="w-full h-full"
-                      title="Pitch Deck"
-                    />
+                    <>
+                      <FileText size={48} className="text-gray-400 mb-4" />
+                      <p className="text-gray-600 font-medium mb-6">This pitch deck is securely vaulted. Click below to generate a secure viewing link.</p>
+                      <button 
+                        onClick={() => handleViewPitch(selectedStartup._id)}
+                        className="bg-[#0B0F19] hover:bg-gray-800 text-white px-6 py-3 rounded-xl flex items-center gap-2 font-bold transition shadow-md"
+                      >
+                        <Eye size={18} /> View Secure Pitch Deck
+                      </button>
+                    </>
                   ) : (
                     <p className="text-gray-500 font-medium">No pitch deck uploaded yet.</p>
                   )}
@@ -579,9 +597,9 @@ export default function InvestorDashboard() {
       )}
 
       {chatOpen && activeConversation && (
-        <div className="fixed bottom-6 right-6 w-[400px] bg-white border border-gray-200 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden animate-in slide-in-from-bottom-8">
+        <div className="fixed bottom-6 right-6 w-[400px] max-h-[85vh] bg-white border border-gray-200 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden animate-in slide-in-from-bottom-8">
           
-          <div className="bg-[#0B0F19] p-4 flex justify-between items-center">
+          <div className="bg-[#0B0F19] p-4 flex justify-between items-center flex-none">
             <div>
               <h3 className="font-bold text-white">
                 {activeConversation.startupId?.companyName || 'Founder'}
@@ -595,7 +613,7 @@ export default function InvestorDashboard() {
             </button>
           </div>
 
-          <div className="flex-1 h-96 overflow-y-auto p-5 space-y-4 bg-gray-50">
+          <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 bg-gray-50">
             {messages.map((msg, idx) => {
               const isMine = msg.senderId?._id === JSON.parse(atob(token.split('.')[1])).id; 
               
@@ -618,7 +636,7 @@ export default function InvestorDashboard() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 bg-white border-t border-gray-100 flex items-center gap-3">
+          <div className="p-4 bg-white border-t border-gray-100 flex items-center gap-3 flex-none">
             <button 
               className="p-2.5 text-gray-400 bg-gray-50 rounded-xl hover:bg-gray-100 hover:text-gray-600 transition"
               title="Upload File"

@@ -8,6 +8,8 @@ export const uploadToCloudinary = async ({ file, upload }) => {
   formData.append('timestamp', upload.timestamp);
   formData.append('signature', upload.signature);
   formData.append('public_id', upload.publicId);
+  formData.append('type', 'upload');
+  formData.append('access_mode', 'public');
 
   const response = await axios.post(upload.uploadUrl, formData, {
     headers: {

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
+import axios from 'axios';
 import {
   Building2,
   CheckCircle2,
@@ -13,7 +14,8 @@ import {
   Paperclip,
   Send,
   X,
-  MessageSquare
+  MessageSquare,
+  Eye
 } from 'lucide-react';
 
 import { useAuth } from '../../contexts/AuthContext';
@@ -131,6 +133,17 @@ const FounderDashboard = () => {
 
   const getOtherParticipant = (conv) => {
     return conv.participants?.find(p => p._id !== user.id) || { name: 'Investor' };
+  };
+
+  const handleViewPitch = async (startupId) => {
+    try {
+      const response = await axios.get(`/api/startups/${startupId}/pitch-url`, {
+        withCredentials: true
+      });
+      window.open(response.data.url, '_blank');
+    } catch (err) {
+      console.error('Failed to load secure pitch deck', err);
+    }
   };
 
   return (
@@ -360,6 +373,16 @@ const FounderDashboard = () => {
                     Update Pitch
                   </Link>
 
+                  {startup.pitchDeckUrl && (
+                    <button
+                      onClick={() => handleViewPitch(startup._id)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      <Eye size={18} />
+                      View Pitch Deck
+                    </button>
+                  )}
+
                   <Link
                     to="/founder/edit-startup"
                     className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
@@ -395,9 +418,9 @@ const FounderDashboard = () => {
       </main>
 
       {chatOpen && activeConversation && (
-        <div className="fixed bottom-6 right-6 w-[400px] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden animate-in slide-in-from-bottom-8">
+        <div className="fixed bottom-6 right-6 w-[400px] max-h-[85vh] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden animate-in slide-in-from-bottom-8">
           
-          <div className="bg-slate-950 p-4 flex justify-between items-center">
+          <div className="bg-slate-950 p-4 flex justify-between items-center flex-none">
             <div>
               <h3 className="font-bold text-white">
                 {getOtherParticipant(activeConversation).name}
@@ -411,7 +434,7 @@ const FounderDashboard = () => {
             </button>
           </div>
 
-          <div className="flex-1 h-96 overflow-y-auto p-5 space-y-4 bg-slate-50">
+          <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4 bg-slate-50">
             {messages.map((msg, idx) => {
               const isMine = msg.senderId?._id === user.id || msg.senderId === user.id; 
               
@@ -434,7 +457,7 @@ const FounderDashboard = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 bg-white border-t border-slate-100 flex items-center gap-3">
+          <div className="p-4 bg-white border-t border-slate-100 flex items-center gap-3 flex-none">
             <button 
               className="p-2.5 text-slate-400 bg-slate-50 rounded-xl hover:bg-slate-100 hover:text-slate-600 transition"
               title="Upload File"
