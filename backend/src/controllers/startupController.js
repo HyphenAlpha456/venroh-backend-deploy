@@ -9,7 +9,7 @@ import Startup from '../models/Startup.js';
 import cloudinary from '../config/cloudinary.js';
 import { getIO } from '../socket/socket.js';
 import { verifyRealMCA } from '../services/mcaService.js';
-import summarizer from '../services/neuralPitchSummarizer.js';
+import summarizer from '../services/NeuralPitchSummarizer.js';
 
 const allowedPitchDeckMimeTypes = [
   'application/pdf',
