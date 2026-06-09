@@ -9,6 +9,13 @@ export const verifyRealMCA = async (cin) => {
       referenceId: crypto.randomBytes(8).toString('hex')
     };
   }
+  //  if (cin === 'U72900KA2015PTC082989') {
+  //   return {
+  //     verified: true,
+  //     legalName: 'Archita pvt ltd',
+  //     referenceId: crypto.randomBytes(8).toString('hex')
+  //   };
+  // }
 
   try {
     const verificationId = crypto.randomBytes(8).toString('hex');

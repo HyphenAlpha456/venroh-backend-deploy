@@ -5,12 +5,17 @@ import Meeting from '../models/Meeting.js';
 import Startup from '../models/Startup.js';
 import User from '../models/User.js';
 
-const auth = new google.auth.GoogleAuth({
-  keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS || './google-credentials.json',
-  scopes: ['https://www.googleapis.com/auth/calendar.events'],
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI
+);
+
+oauth2Client.setCredentials({
+  refresh_token: process.env.GOOGLE_REFRESH_TOKEN
 });
 
-const calendar = google.calendar({ version: 'v3', auth });
+const calendar = google.calendar({ version: 'v3', auth: oauth2Client }); 
 
 const createCalendarInvite = async (attendeeEmails, scheduledTime, meetingUrl) => {
   const event = {

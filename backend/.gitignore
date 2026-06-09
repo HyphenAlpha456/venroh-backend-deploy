@@ -122,3 +122,4 @@ dist
 
 # VENROH SPECIFIC SECURITY FILES - DO NOT REMOVE
 google-credentials.json
+generateAuthUrl.js
